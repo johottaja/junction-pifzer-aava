@@ -8,6 +8,14 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Platform } from 'react-native';
 
+// Helper function to add opacity to hex colors
+const hexToRgba = (hex: string, alpha: number): string => {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
 export default function PredictionScreen() {
   const colorScheme = useColorScheme();
   const theme = Colors[colorScheme ?? 'light'];
@@ -97,7 +105,7 @@ export default function PredictionScreen() {
                   <ThemedView
                     style={[
                       styles.riskBadge,
-                      { backgroundColor: getRiskColor(prediction.risk) + '20' },
+                      { backgroundColor: hexToRgba(getRiskColor(prediction.risk), 0.12) },
                     ]}
                   >
                     <ThemedText
@@ -217,17 +225,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     marginBottom: 20,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.03,
-        shadowRadius: 12,
-      },
-      android: {
-        elevation: 1,
-      },
-    }),
   },
   cardHeader: {
     flexDirection: 'row',
