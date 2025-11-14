@@ -1,13 +1,12 @@
-import React from 'react';
-import { StyleSheet, ScrollView, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Platform } from 'react-native';
 import { Link } from 'expo-router';
+import React from 'react';
+import { ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 // Helper function to add opacity to hex colors
 const hexToRgba = (hex: string, alpha: number): string => {
@@ -263,6 +262,7 @@ const styles = StyleSheet.create({
   },
   statusContent: {
     flex: 1,
+    backgroundColor: "transparent",
   },
   statusTitle: {
     fontSize: 16,
@@ -309,16 +309,20 @@ const styles = StyleSheet.create({
     padding: 24,
     borderRadius: 20,
     borderWidth: 1,
+    backgroundColor: "transparent",
   },
   statRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: "transparent",
   },
   statItem: {
     flex: 1,
     alignItems: 'center',
+    backgroundColor: "transparent",
   },
   statValue: {
+    paddingTop: 15,
     fontSize: 32,
     fontWeight: '700',
     marginBottom: 4,
@@ -330,6 +334,7 @@ const styles = StyleSheet.create({
     width: 1,
     height: 40,
     marginHorizontal: 20,
+    backgroundColor: "transparent",
   },
   activityCard: {
     padding: 24,
@@ -340,12 +345,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    backgroundColor: "transparent",
   },
   activityLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     flex: 1,
+    backgroundColor: "transparent",
   },
   activityIcon: {
     width: 36,
@@ -353,9 +360,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: "transparent",
   },
   activityInfo: {
     flex: 1,
+    backgroundColor: "transparent",
   },
   activityIntensity: {
     fontSize: 15,
