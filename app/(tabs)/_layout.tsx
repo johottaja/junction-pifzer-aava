@@ -18,7 +18,7 @@ export default function TabLayout() {
           backgroundColor: Colors[colorScheme ?? 'light'].background,
           borderTopColor: Colors[colorScheme ?? 'light'].border,
           borderTopWidth: 1,
-          height: 60,
+          height: 80,
           paddingBottom: 8,
           paddingTop: 8,
         },

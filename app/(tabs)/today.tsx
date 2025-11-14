@@ -3,9 +3,9 @@ import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Platform } from 'react-native';
+import { Link } from 'expo-router';
 
 // Helper function to add opacity to hex colors
 const hexToRgba = (hex: string, alpha: number): string => {
@@ -445,6 +445,7 @@ const styles = StyleSheet.create({
   },
   timeWindowContent: {
     flex: 1,
+    backgroundColor: "transparent",
   },
   timeWindowLabel: {
     fontSize: 12,
@@ -495,27 +496,37 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  actionContent: {
-    flex: 1,
+  actionLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    textAlign: 'center',
   },
-  actionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
+  statsCard: {
+    padding: 24,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  statRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: 32,
+    fontWeight: '700',
     marginBottom: 4,
   },
   actionDescription: {
     fontSize: 13,
     lineHeight: 18,
   },
-  priorityBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  priorityText: {
-    fontSize: 11,
-    fontWeight: '600',
-    textTransform: 'uppercase',
+  statDivider: {
+    width: 1,
+    height: 40,
+    marginHorizontal: 20,
   },
   activityCard: {
     padding: 24,
@@ -526,12 +537,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    backgroundColor: "transparent",
   },
   activityLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     flex: 1,
+    backgroundColor: "transparent",
   },
   activityIcon: {
     width: 36,
@@ -539,9 +552,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: "transparent",
   },
   activityInfo: {
     flex: 1,
+    backgroundColor: "transparent",
   },
   activityIntensity: {
     fontSize: 15,

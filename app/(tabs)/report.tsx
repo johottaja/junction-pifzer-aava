@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
-import { StyleSheet, ScrollView, TouchableOpacity, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import React, { useState } from 'react';
+import { ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function ReportScreen() {
   const colorScheme = useColorScheme();
@@ -209,6 +208,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+    backgroundColor: "transparent",
   },
   intensityButton: {
     width: 52,
@@ -226,6 +226,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
+    backgroundColor: "transparent",
   },
   chip: {
     paddingHorizontal: 18,
