@@ -1,29 +1,175 @@
-import { Link } from 'expo-router';
-import { StyleSheet } from 'react-native';
-
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { router } from 'expo-router';
+import { Platform, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+const devices = [
+  { name: 'GARMIN', logo: 'GARMIN.' },
+  { name: 'POLAR', logo: 'POLAR' },
+  { name: 'ZWIFT', logo: 'ZWIFT' },
+  { name: 'SUUNTO', logo: 'SUUNTO' },
+  { name: 'wahoo', logo: 'wahoo' },
+  { name: 'PELOTON', logo: 'PELOTON' },
+  { name: 'amazfit', logo: 'amazfit' },
+  { name: 'COROS', logo: 'COROS' },
+  { name: 'SAMSUNG', logo: 'SAMSUNG' },
+  { name: 'fitbit', logo: 'fitbit' },
+  { name: 'Nike', logo: 'Nike' },
+  { name: 'ŌURA', logo: 'ŌURA' },
+  { name: 'HUAWEI', logo: 'HUAWEI' },
+];
 
 export default function ModalScreen() {
+  const colorScheme = useColorScheme();
+  const theme = Colors[colorScheme ?? 'light'];
+
+  const handleDevicePress = (deviceName: string) => {
+    // TODO: Implement device connection logic
+    console.log('Connect to:', deviceName);
+  };
+
   return (
-    <ThemedView style={styles.container}>
-      <ThemedText type="title">This is a modal</ThemedText>
-      <Link href="/" dismissTo style={styles.link}>
-        <ThemedText type="link">Go to home screen</ThemedText>
-      </Link>
-    </ThemedView>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
+      <ThemedView style={[styles.header, { borderBottomColor: theme.border }]}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backButton}
+        >
+          <IconSymbol name="chevron.left" size={24} color={theme.text} />
+        </TouchableOpacity>
+        <ThemedText type="title" style={styles.headerTitle}>Devices</ThemedText>
+        <ThemedView style={styles.headerSpacer} />
+      </ThemedView>
+
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <ThemedView style={styles.content}>
+          <ThemedText type="title" style={styles.title}>Connect Your Device</ThemedText>
+          <ThemedText style={[styles.description, { color: theme.textSecondary }]}>
+            Strava pairs with almost every fitness device and app. Get seamless activity uploads - plus a fuller picture of your performance and recovery.
+          </ThemedText>
+
+          <ThemedView style={styles.deviceGrid}>
+            {devices.map((device, index) => (
+              <TouchableOpacity
+                key={index}
+                style={[
+                  styles.deviceButton,
+                  {
+                    backgroundColor: theme.card,
+                    borderColor: theme.cardBorder,
+                  },
+                ]}
+                onPress={() => handleDevicePress(device.name)}
+              >
+                <ThemedText style={styles.deviceName}>{device.logo}</ThemedText>
+              </TouchableOpacity>
+            ))}
+          </ThemedView>
+
+          <TouchableOpacity
+            style={styles.differentDeviceLink}
+            onPress={() => {
+              // TODO: Handle different device
+              console.log('Different device');
+            }}
+          >
+            <ThemedText style={[styles.differentDeviceText, { color: theme.primary }]}>
+              I have a different device
+            </ThemedText>
+          </TouchableOpacity>
+        </ThemedView>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+  },
+  backButton: {
+    padding: 4,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  headerSpacer: {
+    width: 32,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+  content: {
+    flex: 1,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    marginBottom: 16,
+  },
+  description: {
+    fontSize: 16,
+    lineHeight: 24,
+    marginBottom: 32,
+  },
+  deviceGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 24,
+  },
+  deviceButton: {
+    width: '47%',
+    aspectRatio: 2.5,
+    borderRadius: 12,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
+    padding: 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 1,
+      },
+    }),
   },
-  link: {
-    marginTop: 15,
-    paddingVertical: 15,
+  deviceName: {
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  differentDeviceLink: {
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  differentDeviceText: {
+    fontSize: 16,
+    fontWeight: '500',
   },
 });

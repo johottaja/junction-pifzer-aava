@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, ScrollView, TouchableOpacity, Switch, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Link } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
@@ -57,6 +58,17 @@ export default function SettingsScreen() {
       ],
     },
     {
+      title: 'Devices',
+      items: [
+        {
+          icon: 'link.circle.fill',
+          label: 'Connect a device',
+          type: 'navigation',
+          href: '/modal',
+        },
+      ],
+    },
+    {
       title: 'About',
       items: [
         {
@@ -85,24 +97,8 @@ export default function SettingsScreen() {
   };
 
   const SettingItem = ({ item }: { item: any }) => {
-    return (
-      <TouchableOpacity
-        style={[
-          styles.settingItem,
-          {
-            backgroundColor: theme.card,
-            borderColor: theme.cardBorder,
-          },
-        ]}
-        onPress={() => {
-          if (item.type === 'navigation') {
-            handleNavigation(item.label);
-          } else if (item.type === 'toggle' && item.onToggle) {
-            item.onToggle(!item.value);
-          }
-        }}
-        disabled={item.type === 'text'}
-      >
+    const content = (
+      <>
         <ThemedView style={styles.settingItemLeft}>
           <ThemedView
             style={[
@@ -132,6 +128,46 @@ export default function SettingsScreen() {
             <IconSymbol name="chevron.right" size={16} color={theme.textSecondary} />
           )}
         </ThemedView>
+      </>
+    );
+
+    if (item.href) {
+      return (
+        <Link href={item.href} asChild>
+          <TouchableOpacity
+            style={[
+              styles.settingItem,
+              {
+                backgroundColor: theme.card,
+                borderColor: theme.cardBorder,
+              },
+            ]}
+          >
+            {content}
+          </TouchableOpacity>
+        </Link>
+      );
+    }
+
+    return (
+      <TouchableOpacity
+        style={[
+          styles.settingItem,
+          {
+            backgroundColor: theme.card,
+            borderColor: theme.cardBorder,
+          },
+        ]}
+        onPress={() => {
+          if (item.type === 'navigation') {
+            handleNavigation(item.label);
+          } else if (item.type === 'toggle' && item.onToggle) {
+            item.onToggle(!item.value);
+          }
+        }}
+        disabled={item.type === 'text'}
+      >
+        {content}
       </TouchableOpacity>
     );
   };
