@@ -101,10 +101,10 @@ export default function SettingsScreen() {
       <>
         <ThemedView style={styles.settingItemLeft}>
           <ThemedView
-            style={[
-              styles.iconContainer,
-              { backgroundColor: theme.backgroundSecondary },
-            ]}
+            style={{
+              ...styles.iconContainer,
+              backgroundColor: theme.backgroundSecondary,
+            }}
           >
             <IconSymbol name={item.icon} size={20} color={theme.primary} />
           </ThemedView>
@@ -120,7 +120,7 @@ export default function SettingsScreen() {
             />
           )}
           {item.type === 'text' && (
-            <ThemedText style={[styles.settingValue, { color: theme.textSecondary }]}>
+            <ThemedText style={{ ...styles.settingValue, color: theme.textSecondary }}>
               {item.value}
             </ThemedText>
           )}
@@ -131,18 +131,16 @@ export default function SettingsScreen() {
       </>
     );
 
+    const settingItemStyle = {
+      ...styles.settingItem,
+      backgroundColor: theme.card,
+      borderColor: theme.cardBorder,
+    };
+
     if (item.href) {
       return (
         <Link href={item.href} asChild>
-          <TouchableOpacity
-            style={[
-              styles.settingItem,
-              {
-                backgroundColor: theme.card,
-                borderColor: theme.cardBorder,
-              },
-            ]}
-          >
+          <TouchableOpacity style={settingItemStyle}>
             {content}
           </TouchableOpacity>
         </Link>
@@ -151,13 +149,7 @@ export default function SettingsScreen() {
 
     return (
       <TouchableOpacity
-        style={[
-          styles.settingItem,
-          {
-            backgroundColor: theme.card,
-            borderColor: theme.cardBorder,
-          },
-        ]}
+        style={settingItemStyle}
         onPress={() => {
           if (item.type === 'navigation') {
             handleNavigation(item.label);
@@ -173,7 +165,7 @@ export default function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
+    <SafeAreaView style={{ ...styles.container, backgroundColor: theme.background }} edges={['top']}>
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -181,14 +173,14 @@ export default function SettingsScreen() {
       >
         <ThemedView style={styles.header}>
           <ThemedText type="title" style={styles.title}>Settings</ThemedText>
-          <ThemedText style={[styles.subtitle, { color: theme.textSecondary }]}>
+          <ThemedText style={{ ...styles.subtitle, color: theme.textSecondary }}>
             Manage your app preferences
           </ThemedText>
         </ThemedView>
 
         {settingsSections.map((section, sectionIndex) => (
           <ThemedView key={sectionIndex} style={styles.section}>
-            <ThemedText style={[styles.sectionTitle, { color: theme.textSecondary }]}>
+            <ThemedText style={{ ...styles.sectionTitle, color: theme.textSecondary }}>
               {section.title}
             </ThemedText>
             <ThemedView style={styles.sectionContent}>
@@ -200,10 +192,10 @@ export default function SettingsScreen() {
         ))}
 
         <ThemedView style={styles.footer}>
-          <ThemedText style={[styles.footerText, { color: theme.textSecondary }]}>
+          <ThemedText style={{ ...styles.footerText, color: theme.textSecondary }}>
             Migraine Tracker v1.0.0
           </ThemedText>
-          <ThemedText style={[styles.footerText, { color: theme.textSecondary }]}>
+          <ThemedText style={{ ...styles.footerText, color: theme.textSecondary }}>
             Built with care for your health
           </ThemedText>
         </ThemedView>
