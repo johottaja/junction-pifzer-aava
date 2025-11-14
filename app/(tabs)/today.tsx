@@ -9,6 +9,14 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Platform } from 'react-native';
 import { Link } from 'expo-router';
 
+// Helper function to add opacity to hex colors
+const hexToRgba = (hex: string, alpha: number): string => {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
 export default function TodayScreen() {
   const colorScheme = useColorScheme();
   const theme = Colors[colorScheme ?? 'light'];
@@ -54,13 +62,11 @@ export default function TodayScreen() {
 
         {todayStats.hasMigraine ? (
           <ThemedView
-            style={[
-              styles.alertCard,
-              {
-                backgroundColor: theme.error + '15',
-                borderColor: theme.error + '40',
-              },
-            ]}
+            style={{
+              ...styles.alertCard,
+              backgroundColor: hexToRgba(theme.error, 0.08),
+              borderColor: hexToRgba(theme.error, 0.25),
+            }}
           >
             <IconSymbol name="exclamationmark.triangle.fill" size={24} color={theme.error} />
             <ThemedView style={styles.alertContent}>
@@ -74,13 +80,11 @@ export default function TodayScreen() {
           </ThemedView>
         ) : (
           <ThemedView
-            style={[
-              styles.statusCard,
-              {
-                backgroundColor: theme.success + '15',
-                borderColor: theme.success + '40',
-              },
-            ]}
+            style={{
+              ...styles.statusCard,
+              backgroundColor: hexToRgba(theme.success, 0.08),
+              borderColor: hexToRgba(theme.success, 0.25),
+            }}
           >
             <IconSymbol name="checkmark.circle.fill" size={24} color={theme.success} />
             <ThemedView style={styles.statusContent}>
@@ -97,42 +101,38 @@ export default function TodayScreen() {
         <ThemedView style={styles.section}>
           <ThemedText type="subtitle" style={styles.sectionTitle}>Quick Actions</ThemedText>
           <ThemedView style={styles.actionsGrid}>
-            {quickActions.map((action, index) => (
-              <Link key={index} href={action.route} asChild>
-                <TouchableOpacity
-                  style={[
-                    styles.actionCard,
-                    {
-                      backgroundColor: theme.card,
-                      borderColor: theme.cardBorder,
-                    },
-                  ]}
-                >
-                  <ThemedView
-                    style={[
-                      styles.actionIconContainer,
-                      { backgroundColor: action.color + '20' },
-                    ]}
-                  >
-                    <IconSymbol name={action.icon} size={24} color={action.color} />
-                  </ThemedView>
-                  <ThemedText style={styles.actionLabel}>{action.label}</ThemedText>
-                </TouchableOpacity>
-              </Link>
-            ))}
+            {quickActions.map((action, index) => {
+              const actionCardStyle = {
+                ...styles.actionCard,
+                backgroundColor: theme.card,
+                borderColor: theme.cardBorder,
+              };
+              const iconContainerStyle = {
+                ...styles.actionIconContainer,
+                backgroundColor: hexToRgba(action.color, 0.12),
+              };
+              return (
+                <Link key={index} href={action.route} asChild>
+                  <TouchableOpacity style={actionCardStyle}>
+                    <ThemedView style={iconContainerStyle}>
+                      <IconSymbol name={action.icon} size={24} color={action.color} />
+                    </ThemedView>
+                    <ThemedText style={styles.actionLabel}>{action.label}</ThemedText>
+                  </TouchableOpacity>
+                </Link>
+              );
+            })}
           </ThemedView>
         </ThemedView>
 
         <ThemedView style={styles.section}>
           <ThemedText type="subtitle" style={styles.sectionTitle}>Today's Stats</ThemedText>
           <ThemedView
-            style={[
-              styles.statsCard,
-              {
-                backgroundColor: theme.card,
-                borderColor: theme.cardBorder,
-              },
-            ]}
+            style={{
+              ...styles.statsCard,
+              backgroundColor: theme.card,
+              borderColor: theme.cardBorder,
+            }}
           >
             <ThemedView style={styles.statRow}>
               <ThemedView style={styles.statItem}>
@@ -159,33 +159,31 @@ export default function TodayScreen() {
         <ThemedView style={styles.section}>
           <ThemedText type="subtitle" style={styles.sectionTitle}>Recent Activity</ThemedText>
           <ThemedView
-            style={[
-              styles.activityCard,
-              {
-                backgroundColor: theme.card,
-                borderColor: theme.cardBorder,
-              },
-            ]}
+            style={{
+              ...styles.activityCard,
+              backgroundColor: theme.card,
+              borderColor: theme.cardBorder,
+            }}
           >
             {recentActivity.map((activity, index) => (
               <ThemedView
                 key={index}
-                style={[
-                  styles.activityItem,
-                  index !== recentActivity.length - 1 && {
+                style={{
+                  ...styles.activityItem,
+                  ...(index !== recentActivity.length - 1 && {
                     borderBottomColor: theme.border,
                     borderBottomWidth: 1,
                     paddingBottom: 16,
                     marginBottom: 16,
-                  },
-                ]}
+                  }),
+                }}
               >
                 <ThemedView style={styles.activityLeft}>
                   <ThemedView
-                    style={[
-                      styles.activityIcon,
-                      { backgroundColor: theme.backgroundSecondary },
-                    ]}
+                    style={{
+                      ...styles.activityIcon,
+                      backgroundColor: theme.backgroundSecondary,
+                    }}
                   >
                     <IconSymbol name="bolt.fill" size={16} color={theme.warning} />
                   </ThemedView>
@@ -294,17 +292,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
     gap: 10,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.03,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 1,
-      },
-    }),
   },
   actionIconContainer: {
     width: 52,
@@ -322,17 +309,6 @@ const styles = StyleSheet.create({
     padding: 24,
     borderRadius: 20,
     borderWidth: 1,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.03,
-        shadowRadius: 12,
-      },
-      android: {
-        elevation: 1,
-      },
-    }),
   },
   statRow: {
     flexDirection: 'row',
@@ -359,17 +335,6 @@ const styles = StyleSheet.create({
     padding: 24,
     borderRadius: 20,
     borderWidth: 1,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.03,
-        shadowRadius: 12,
-      },
-      android: {
-        elevation: 1,
-      },
-    }),
   },
   activityItem: {
     flexDirection: 'row',

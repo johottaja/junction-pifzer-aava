@@ -197,17 +197,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     marginBottom: 20,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.03,
-        shadowRadius: 12,
-      },
-      android: {
-        elevation: 1,
-      },
-    }),
   },
   sectionTitle: {
     marginBottom: 8,
