@@ -64,7 +64,7 @@ export default function SettingsScreen() {
           icon: 'link.circle.fill',
           label: 'Connect a device',
           type: 'navigation',
-          href: '/modal',
+          href: '/(tabs)/devices',
         },
       ],
     },

@@ -47,6 +47,13 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="devices"
+        options={{
+          title: 'Devices',
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="link.circle.fill" color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="settings"
         options={{
           title: 'Settings',
