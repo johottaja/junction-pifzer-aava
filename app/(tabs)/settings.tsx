@@ -16,6 +16,7 @@ export default function SettingsScreen() {
   const [analyticsEnabled, setAnalyticsEnabled] = React.useState(true);
 
   const settingsSections = [
+    //Kommentti
     {
       title: 'Notifications',
       items: [
