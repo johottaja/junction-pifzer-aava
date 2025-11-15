@@ -1,164 +1,128 @@
 """
-Simple Migraine Prediction System
-- ONE model for all users
-- No per-user files
-- Just store data to training pool and make predictions
+User-Specific Migraine Prediction System
+- PERSONALIZED model for EACH user
+- Each user has their own trained model based on their data
+- Temporal analysis (7-day predictions) with user-specific patterns
 """
 
-from predict import predict_single
-from data_utils import PersonalizedDataHandler
+import os
+import sys
 
-# Global data handler
-_data_handler = None
+# Handle both package import and direct script execution
+try:
+    from .user_model_manager import UserModelManager
+except ImportError:
+    from user_model_manager import UserModelManager
 
-def get_data_handler():
-    """Get or create global data handler"""
-    global _data_handler
-    if _data_handler is None:
-        _data_handler = PersonalizedDataHandler(data_dir='user_data')
-    return _data_handler
+# Global model manager
+_model_manager = None
+
+def get_model_manager():
+    """Get or create global model manager"""
+    global _model_manager
+    if _model_manager is None:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        _model_manager = UserModelManager(
+            models_dir=os.path.join(script_dir, 'models'),
+            user_data_dir=os.path.join(script_dir, 'user_data')
+        )
+    return _model_manager
 
 
 def predict_migraine(user_id, data=None, days_data=None, explain=True):
     """
-    Make migraine prediction for any user
+    Predict migraine probability for a specific user using THEIR personalized model
     
-    Can use either single day OR multiple days (1-7 days) for better accuracy.
-    
-    Parameters:
-    -----------
-    user_id : str
-        User identifier (for tracking only)
-    data : dict, optional
-        Single day's sensor/health data (10 parameters, NO migraine field)
-    days_data : list of dict, optional
-        List of 1-7 days of data (most recent last)
-        Better predictions with more days!
-    explain : bool
-        Show detailed explanation
+    Args:
+        user_id (int): User identifier (e.g., 123, 456) - must be integer (int8)
+        data (dict, optional): Single day of sensor data
+        days_data (list, optional): List of 1-7 days of sensor data (oldest first)
+        explain (bool): Whether to print explanation
     
     Returns:
-    --------
-    dict with 'probability', 'risk_level', 'recommendation', 'days_analyzed'
+        dict: {
+            'user_id': str,
+            'probability': float (0-100),
+            'risk_level': str,
+            'model_type': str ('personalized' or 'fallback')
+        }
     
-    Example (Single Day):
-    ---------------------
-    result = predict_migraine('patient123', data={
-        'Screen_time_h': 8.0,
-        'Average_heart_rate_bpm': 75,
-        'Steps_and_activity': 6000,
-        'Sleep_h': 6.5,
-        'Stress_level_0_100': 65,
-        'Respiration_rate_breaths_min': 16,
-        'Saa_Temperature_average_C': 24.0,
-        'Saa_Air_quality_0_5': 3,
-        'Received_Condition_0_3': 1,
-        'Received_Air_Pressure_hPa': 1010.0
-    })
-    
-    Example (Multiple Days - BETTER):
-    ----------------------------------
-    result = predict_migraine('patient123', days_data=[
-        {...day 7 ago...},
-        {...day 6 ago...},
-        {...day 5 ago...},
-        {...yesterday...},
-        {...today...}  # Most recent last
-    ])
-    
-    print(f"Risk: {result['probability']}% (analyzed {result['days_analyzed']} days)")
+    Note: User must have a trained model first. Use store_training_data() to collect data,
+          then train_user_model() to create their personalized model.
     """
-    if explain:
-        print(f"\n{'='*70}")
-        print(f"MIGRAINE PREDICTION FOR USER '{user_id}'")
-        print(f"{'='*70}")
+    user_id = int(user_id)  # Ensure int8 format
+    manager = get_model_manager()
     
-    # Determine how many days we're analyzing
+    # Determine which data format was provided
     if days_data is not None:
-        num_days = len(days_data)
-        if num_days < 1 or num_days > 7:
-            raise ValueError("days_data must contain 1-7 days of data")
-        
-        # Use the most recent day as "today"
-        today_data = days_data[-1]
-        history_data = days_data[:-1] if num_days > 1 else []
-        
-        if explain:
-            print(f"\n📊 Analyzing {num_days} days of data")
-            if history_data:
-                print(f"   - Historical days: {len(history_data)}")
-                print(f"   - Today (prediction day): 1")
+        # Multi-day prediction
+        if not isinstance(days_data, list) or len(days_data) == 0:
+            raise ValueError("days_data must be a non-empty list")
+        today_data = days_data[-1]  # Most recent day
+        history_data = days_data[:-1] if len(days_data) > 1 else []
     elif data is not None:
-        num_days = 1
+        # Single day prediction
         today_data = data
         history_data = []
+    else:
+        raise ValueError("Must provide either 'data' or 'days_data'")
+    
+    # Check if user has a trained model
+    if not manager.user_has_model(user_id):
+        data_count = manager.get_user_data_count(user_id)
+        raise FileNotFoundError(
+            f"❌ No trained model found for user '{user_id}'.\n"
+            f"   User has {data_count} data points.\n"
+            f"   Please collect at least 10 data points with store_training_data(),\n"
+            f"   then train the model with train_user_model('{user_id}')"
+        )
+    
+    # Get base prediction from user's personalized model
+    base_probability = manager.predict(user_id, today_data)
+    
+    # Apply temporal adjustment if we have history
+    if len(history_data) > 0:
+        adjustment = _calculate_temporal_adjustment(history_data, today_data)
+        final_probability = min(100.0, max(0.0, base_probability + adjustment))
         
         if explain:
-            print(f"\n📊 Analyzing 1 day of data (single-day prediction)")
+            print(f"\n{'='*70}")
+            print(f"PERSONALIZED PREDICTION FOR USER: {user_id}")
+            print(f"{'='*70}")
+            print(f"Analysis period: {len(days_data)} days")
+            print(f"Base prediction (user's model): {base_probability:.1f}%")
+            print(f"Temporal adjustment: {adjustment:+.1f}%")
+            print(f"Final prediction: {final_probability:.1f}%")
+            print(f"{'='*70}\n")
     else:
-        raise ValueError("Must provide either 'data' (single day) or 'days_data' (1-7 days)")
-    
-    # Make base prediction for today
-    base_result = predict_single(today_data, explain=False)
-    base_probability = base_result['probability']
-    
-    # Apply temporal adjustments if we have history
-    if history_data:
-        adjustment = _calculate_temporal_adjustment(history_data, today_data)
-        adjusted_probability = min(100, max(0, base_probability + adjustment))
+        final_probability = base_probability
         
-        if explain and adjustment != 0:
-            print(f"\n📈 Temporal Analysis:")
-            print(f"   Base prediction: {base_probability:.1f}%")
-            print(f"   Temporal adjustment: {adjustment:+.1f}%")
-            print(f"   Final prediction: {adjusted_probability:.1f}%")
-    else:
-        adjusted_probability = base_probability
-        adjustment = 0
+        if explain:
+            print(f"\n{'='*70}")
+            print(f"PERSONALIZED PREDICTION FOR USER: {user_id}")
+            print(f"{'='*70}")
+            print(f"Single-day prediction: {final_probability:.1f}%")
+            print(f"Using user's personalized model")
+            print(f"{'='*70}\n")
     
     # Determine risk level
-    if adjusted_probability < 15:
+    if final_probability < 20:
         risk_level = "Very Low"
-    elif adjusted_probability < 30:
+    elif final_probability < 40:
         risk_level = "Low"
-    elif adjusted_probability < 70:
+    elif final_probability < 60:
         risk_level = "Moderate"
-    elif adjusted_probability < 85:
+    elif final_probability < 80:
         risk_level = "High"
     else:
         risk_level = "Very High"
     
-    # Get recommendation
-    recommendations = {
-        "Very Low": "Low risk of migraine. Continue monitoring your health.",
-        "Low": "Low risk. Maintain current healthy habits.",
-        "Moderate": "Moderate risk. Avoid known triggers and ensure adequate rest.",
-        "High": "High risk. Take preventive measures and prepare medication.",
-        "Very High": "Very high risk. Consider consulting healthcare provider and take immediate preventive action."
-    }
-    recommendation = recommendations.get(risk_level, "Monitor your health.")
-    
-    result = {
-        'probability': adjusted_probability,
-        'base_probability': base_probability,
-        'temporal_adjustment': adjustment,
+    return {
+        'user_id': user_id,
+        'probability': final_probability,
         'risk_level': risk_level,
-        'recommendation': recommendation,
-        'days_analyzed': num_days
+        'model_type': 'personalized'
     }
-    
-    if explain:
-        print(f"\n{'='*70}")
-        print(f"PREDICTION RESULT")
-        print(f"{'='*70}")
-        print(f"\n🎯 Migraine Probability: {result['probability']:.1f}%")
-        print(f"📊 Days Analyzed: {result['days_analyzed']}")
-        if adjustment != 0:
-            print(f"📈 Temporal Impact: {adjustment:+.1f}%")
-        print(f"⚠️  Risk Level: {result['risk_level']}")
-        print(f"💡 {result['recommendation']}\n")
-    
-    return result
 
 
 def _calculate_temporal_adjustment(history_data, today_data):
@@ -243,75 +207,136 @@ def _calculate_temporal_adjustment(history_data, today_data):
     return adjustment
 
 
-def store_training_data(user_id, data, migraine_occurred):
+def store_training_data(user_id, data):
     """
-    Store data with migraine outcome to training pool
+    Store user's sensor data with migraine outcome for training
     
-    Parameters:
-    -----------
-    user_id : str
-        User identifier (for tracking)
-    data : dict
-        Sensor/health data (10 parameters)
-    migraine_occurred : bool
-        Did migraine actually occur? True/False
+    Args:
+        user_id (int): User identifier (e.g., 123, 456) - must be integer (int8)
+        data (dict): Training data with 11 fields:
+                    - 10 sensor features
+                    - Migraine_today_0_or_1 (0 or 1)
     
     Returns:
-    --------
-    dict with 'total_records'
+        int: Total number of data points stored for this user
     
     Example:
-    --------
-    store_training_data('patient123', {
-        'Screen_time_h': 8.0,
-        ... (10 parameters) ...
-    }, migraine_occurred=True)
+        data = {
+            'Screen_time_h': 11.0,
+            'Average_heart_rate_bpm': 85,
+            'Steps_and_activity': 3000,
+            'Sleep_h': 5.0,
+            'Stress_level_0_100': 85,
+            'Respiration_rate_breaths_min': 18,
+            'Saa_Temperature_average_C': 27.0,
+            'Saa_Air_quality_0_5': 4,
+            'Received_Condition_0_3': 2,
+            'Received_Air_Pressure_hPa': 1006.0,
+            'Migraine_today_0_or_1': 1  # 1 = had migraine, 0 = no migraine
+        }
+        
+        count = store_training_data(123, data)
+        print(f"User now has {count} training data points")
     """
-    print(f"\n{'='*70}")
-    print(f"STORING TRAINING DATA FOR USER '{user_id}'")
-    print(f"{'='*70}")
+    user_id = int(user_id)  # Ensure int8 format
+    manager = get_model_manager()
     
-    handler = get_data_handler()
+    if 'Migraine_today_0_or_1' not in data:
+        raise ValueError("Training data must include 'Migraine_today_0_or_1' field (0 or 1)")
     
-    # Save to training pool
-    total_records = handler.save_user_data(
-        user_id=user_id,
-        data=data,
-        migraine_occurred=migraine_occurred
-    )
+    total_count = manager.save_user_data(user_id, data)
     
-    print(f"\n✓ Data stored successfully!")
-    print(f"   - User ID: {user_id}")
-    print(f"   - Migraine occurred: {'YES' if migraine_occurred else 'NO'}")
-    print(f"   - Total records in pool: {total_records}")
+    print(f"\n✓ Data stored for user '{user_id}'")
+    print(f"  Total data points: {total_count}")
     
-    return {'total_records': total_records}
+    if total_count >= 10:
+        if not manager.user_has_model(user_id):
+            print(f"\n💡 TIP: User has {total_count} data points. You can now train a personalized model!")
+            print(f"     Run: train_user_model({user_id})")
+        else:
+            print(f"\n💡 TIP: User's model can be retrained with updated data!")
+            print(f"     Run: train_user_model({user_id})")
+    else:
+        print(f"\n📊 Need {10 - total_count} more data points before training a model")
+    
+    return total_count
 
 
-if __name__ == '__main__':
-    print("\n" + "="*70)
-    print("SIMPLE MIGRAINE PREDICTION SYSTEM")
-    print("="*70)
-    print("\nONE model for ALL users - Simple and effective!")
+def train_user_model(user_id, min_data_points=10):
+    """
+    Train a personalized model for a specific user
     
-    # Example prediction
-    test_data = {
-        'Screen_time_h': 8.0,
-        'Average_heart_rate_bpm': 75,
-        'Steps_and_activity': 6000,
-        'Sleep_h': 6.5,
-        'Stress_level_0_100': 65,
-        'Respiration_rate_breaths_min': 16,
-        'Saa_Temperature_average_C': 24.0,
-        'Saa_Air_quality_0_5': 3,
-        'Received_Condition_0_3': 1,
-        'Received_Air_Pressure_hPa': 1010.0
+    Args:
+        user_id (int): User identifier (e.g., 123, 456) - must be integer (int8)
+        min_data_points (int): Minimum data points required (default: 10)
+    
+    Returns:
+        dict: Training results including accuracy and feature importance
+    
+    Example:
+        # After collecting at least 10 data points
+        result = train_user_model(123)
+        print(f"Model trained with {result['data_points']} data points")
+        print(f"Training accuracy: {result['accuracy']:.2f}%")
+    """
+    user_id = int(user_id)  # Ensure int8 format
+    manager = get_model_manager()
+    
+    try:
+        result = manager.train_user_model(user_id, min_data_points)
+        print(f"\n✅ SUCCESS: Personalized model ready for user '{user_id}'")
+        print(f"   You can now make predictions with predict_migraine({user_id}, ...)\n")
+        return result
+    except Exception as e:
+        print(f"\n❌ ERROR: {str(e)}\n")
+        raise
+
+
+def get_user_info(user_id):
+    """
+    Get information about a user's data and model status
+    
+    Args:
+        user_id (int): User identifier (e.g., 123, 456) - must be integer (int8)
+    
+    Returns:
+        dict: User info including data count and model status
+    """
+    user_id = int(user_id)  # Ensure int8 format
+    manager = get_model_manager()
+    
+    has_data = manager.user_has_data(user_id)
+    has_model = manager.user_has_model(user_id)
+    data_count = manager.get_user_data_count(user_id)
+    
+    info = {
+        'user_id': user_id,
+        'has_data': has_data,
+        'has_model': has_model,
+        'data_points': data_count,
+        'can_train': data_count >= 10,
+        'status': 'Unknown'
     }
     
-    result = predict_migraine('demo_user', test_data)
+    if not has_data:
+        info['status'] = 'No data - start collecting with store_training_data()'
+    elif data_count < 10:
+        info['status'] = f'Need {10 - data_count} more data points before training'
+    elif not has_model:
+        info['status'] = 'Ready to train - call train_user_model()'
+    else:
+        info['status'] = 'Model trained - ready for predictions'
     
-    print("\n💡 Usage:")
-    print("   PREDICT: predict_migraine(user_id, data)")
-    print("   STORE:   store_training_data(user_id, data, migraine_occurred=True/False)")
-    print()
+    return info
+
+
+def list_all_users():
+    """
+    List all users in the system
+    
+    Returns:
+        dict: Lists of users with data and/or models
+    """
+    manager = get_model_manager()
+    return manager.list_all_users()
 
