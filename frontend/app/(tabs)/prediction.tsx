@@ -96,6 +96,7 @@ export default function AIAssistantScreen() {
       }
       const body = {
         message: String(messageToSend),
+        sessionId: '123',
       };
 
       const apiEndpoint = getAIEndpoint();
@@ -108,13 +109,12 @@ export default function AIAssistantScreen() {
       if (!response.ok) {
         throw new Error(`API error: ${response.status}`);
       }
-      console.log('response', await response.text());
 
       const data = await response.json();
       
       // Extract the response text from the API response
       // The API returns the text in the "reponse" field
-      let responseText = data.reponse;
+      let responseText = data.output;
 
       const aiResponse: Message = {
         id: (Date.now() + 1).toString(),
