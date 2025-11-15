@@ -28,10 +28,8 @@ export default function RootLayout() {
     }
   }, [fontsLoaded, fontError]);
 
-  if (!fontsLoaded && !fontError) {
-    return null;
-  }
-
+  // Always render navigation, even if fonts are still loading or failed
+  // The app will use system fonts as fallback
   return (
     <ThemeProvider value={DefaultTheme}>
       <Stack>
