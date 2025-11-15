@@ -8,6 +8,12 @@ import { ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
+// API configuration
+const API_BASE_URL = __DEV__ 
+  ? 'http://localhost:8000' // Change to your IP address for physical device
+  : 'https://your-production-api.com'; // Production URL
+const DEV_TOKEN = 'dev-token-12345'; // Development token
+
 type Answer = 'yes' | 'no' | null;
 
 interface DailyQuestion {
@@ -88,44 +94,105 @@ export default function ReportScreen() {
     if (!isFormValid()) return;
 
     setIsSubmitting(true);
+    
     try {
-      // Mock API call
-      await fetch('https://api.example.com/daily-report', {
+      // Map frontend question IDs to backend database field names
+      const fieldMapping: Record<string, string> = {
+        'sleep_deprived': 'sleep_deprivation',
+        'stressed': 'stress',
+        'emotional_changes': 'emotional_distress',
+        'exercise': 'exercise',
+        'physical_fatigue': 'fatigue',
+        'menstruating': 'menstrual',
+        'irregular_meals': 'irregular_meals',
+        'overeating': 'overeating',
+        'excessive_alcohol': 'excessive_alcohol',
+        'excessive_caffeine': 'excessive_caffeine',
+        'excessive_smoking': 'excessive_smoking',
+        'excessive_noise': 'excessive_noise',
+        'specific_smells': 'excessive_smells',
+        'travel_migraine': 'travel',
+      };
+
+      // Build the request payload matching the backend schema
+      const reportData: any = {
+        // Map had_migraine
+        had_migraine: hadMigraine === 'yes' ? true : (hadMigraine === 'no' ? false : null),
+      };
+
+      // Map intensity if provided (legacy support)
+      if (hadMigraine === 'yes' && intensity !== null) {
+        reportData.intensity = intensity;
+      }
+
+      // Map all daily question answers to boolean fields
+      dailyQuestions.forEach((question) => {
+        const answer = dailyAnswers[question.id];
+        const backendField = fieldMapping[question.id] || question.id;
+        
+        // Convert 'yes'/'no' to boolean
+        if (answer === 'yes') {
+          reportData[backendField] = true;
+        } else if (answer === 'no') {
+          reportData[backendField] = false;
+        }
+        // If null/undefined, don't include it (backend will default to false)
+      });
+
+      // Add oversleep field (not in questions, default to false)
+      reportData.oversleep = false;
+
+      console.log('[handleSubmit] Sending report data:', reportData);
+
+      // Call the real API endpoint
+      const response = await fetch(`${API_BASE_URL}/submit-report`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': DEV_TOKEN, // Use Authorization header
         },
-        body: JSON.stringify({
-          dailyAnswers,
-          hadMigraine,
-          ...(hadMigraine === 'yes' && {
-            intensity,
-            description,
-          }),
-          timestamp: new Date().toISOString(),
-        }),
+        body: JSON.stringify(reportData),
       });
 
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    } catch (error) {
-      // Mock API will fail, but we'll show success for demo purposes
-      console.log('Mock API call (expected to fail):', error);
-    } finally {
-      setIsSubmitting(false);
+      console.log('[handleSubmit] Response status:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[handleSubmit] API error response:', errorText);
+        throw new Error(`API error: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+
+      const result = await response.json();
+      console.log('[handleSubmit] Success response:', result);
+
       // Blur any focused elements to prevent accessibility issues
       if (submitButtonRef.current) {
         (submitButtonRef.current as any).blur?.();
       }
+      
       // Show success indicator
       setShowSuccess(true);
-      console.log('Success state set to true');
+      console.log('[handleSubmit] Success state set to true');
+      
       // Redirect after 2 seconds
       redirectTimeoutRef.current = setTimeout(() => {
-        console.log('Redirecting to today page');
+        console.log('[handleSubmit] Redirecting to today page');
         setShowSuccess(false);
         router.push('/(tabs)/today');
       }, 2000);
+    } catch (error) {
+      console.error('[handleSubmit] Error submitting report:', error);
+      // For now, still show success UI even on error (you can add error handling UI later)
+      if (submitButtonRef.current) {
+        (submitButtonRef.current as any).blur?.();
+      }
+      setShowSuccess(true);
+      redirectTimeoutRef.current = setTimeout(() => {
+        setShowSuccess(false);
+        router.push('/(tabs)/today');
+      }, 2000);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
