@@ -1,7 +1,7 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
+import { Colors, Fonts } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import Constants from 'expo-constants';
 import React, { useState, useRef, useEffect } from 'react';
@@ -295,6 +295,7 @@ export default function AIAssistantScreen() {
                 backgroundColor: theme.inputBackground,
                 borderColor: theme.inputBorder,
                 color: theme.text,
+                fontFamily: Fonts.sans,
               },
             ]}
             placeholder="Ask me anything..."

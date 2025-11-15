@@ -208,10 +208,10 @@ export default function TodayScreen() {
         showsVerticalScrollIndicator={false}
       >
         <ThemedView style={styles.header}>
-          <ThemedText style={{ ...styles.greeting, color: theme.textSecondary }}>Today</ThemedText>
           <ThemedText type="title" style={styles.dateTitle}>
             {dayName}, {monthName} {dayNumber}
           </ThemedText>
+          <ThemedText style={{ ...styles.greeting, color: theme.textSecondary }}>Hey Julie!</ThemedText>
         </ThemedView>
 
         {loading ? (
@@ -300,7 +300,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   greeting: {
-    fontSize: 14,
+    fontSize: 20,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 4,
