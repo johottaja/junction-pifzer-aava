@@ -89,11 +89,17 @@ const fetchMigraineRisk = async (userId: string = '1'): Promise<{
     const riskLevel = getRiskLevelFromPercentage(riskPercentage);
     const message = getMessageFromPercentage(riskPercentage);
 
+    // Extract reason1 and reason2 from API response
+    const reason1 = data.reason1 || null;
+    const reason2 = data.reason2 || null;
+
     return {
       riskLevel,
       riskPercentage,
       factors,
       message,
+      reason1,
+      reason2,
     };
   } catch (error) {
     
@@ -103,6 +109,8 @@ const fetchMigraineRisk = async (userId: string = '1'): Promise<{
       riskPercentage: 45,
       factors: ['Unable to fetch prediction data'],
       message: `Unable to load migraine risk data: ${error instanceof Error ? error.message : 'Network error'}. Please check your connection and try again.`,
+      reason1: 'Air pressure changes',  // Default value
+      reason2: 'dogshit sleep schedule',  // Default value
     };
   }
 };
@@ -200,6 +208,8 @@ export default function TodayScreen() {
     riskPercentage: number;
     factors: string[];
     message: string;
+    reason1?: string;
+    reason2?: string;
   } | null>(null);
   const [recommendedActions, setRecommendedActions] = useState<Array<{
     id: string;
@@ -317,6 +327,58 @@ export default function TodayScreen() {
                   <ThemedText style={{ ...styles.riskPercentage, color: theme.primaryDark }}>
                     {riskData.riskPercentage}%
                   </ThemedText>
+                </ThemedView>
+              </ThemedView>
+            )}
+
+            {riskData && (
+              <ThemedView style={styles.section}>
+                <ThemedText type="subtitle" style={styles.sectionTitle}>Key Triggers</ThemedText>
+                <ThemedView style={styles.triggersList}>
+                  <ThemedView
+                    style={{
+                      ...styles.triggerItem,
+                      backgroundColor: theme.card,
+                      borderColor: theme.cardBorder,
+                      borderWidth: 2,
+                    }}
+                  >
+                    <ThemedView
+                      style={{
+                        ...styles.triggerIconContainer,
+                        backgroundColor: hexToRgba(theme.primary, 0.15),
+                      }}
+                    >
+                      <IconSymbol name="exclamationmark.triangle.fill" size={28} color={theme.primary} />
+                    </ThemedView>
+                    <ThemedView style={{ ...styles.triggerContent, backgroundColor: "transparent" }}>
+                      <ThemedText style={{ ...styles.triggerTitle, backgroundColor: "transparent" }}>
+                        {riskData.reason1 || 'Air pressure changes'}
+                      </ThemedText>
+                    </ThemedView>
+                  </ThemedView>
+                  <ThemedView
+                    style={{
+                      ...styles.triggerItem,
+                      backgroundColor: theme.card,
+                      borderColor: theme.cardBorder,
+                      borderWidth: 2,
+                    }}
+                  >
+                    <ThemedView
+                      style={{
+                        ...styles.triggerIconContainer,
+                        backgroundColor: hexToRgba(theme.primary, 0.15),
+                      }}
+                    >
+                      <IconSymbol name="exclamationmark.triangle.fill" size={28} color={theme.primary} />
+                    </ThemedView>
+                    <ThemedView style={{ ...styles.triggerContent, backgroundColor: "transparent" }}>
+                      <ThemedText style={{ ...styles.triggerTitle, backgroundColor: "transparent" }}>
+                        {riskData.reason2 || 'dogshit sleep schedule'}
+                      </ThemedText>
+                    </ThemedView>
+                  </ThemedView>
                 </ThemedView>
               </ThemedView>
             )}
@@ -538,6 +600,32 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     marginBottom: 12,
+  },
+  triggersList: {
+    gap: 12,
+  },
+  triggerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 20,
+    borderRadius: 16,
+    gap: 12,
+    backgroundColor: "transparent",
+  },
+  triggerIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: "transparent",
+  },
+  triggerContent: {
+    flex: 1,
+  },
+  triggerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
   },
   actionsList: {
     gap: 12,

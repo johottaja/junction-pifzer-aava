@@ -307,11 +307,11 @@ async def get_migraine_data(
                     else:
                         errors.append("Sensor model: Probability not found in result")
                     
-                    # Extract reason1 from sensor model
-                    sensor_reason1 = sensor_result.get('reason1')
-                    if sensor_reason1:
-                        reason1 = sensor_reason1
-                        print(f"[get_migraine_data] Sensor model reason1: {reason1}")
+                    # Extract reason2 from sensor model (switched from reason1)
+                    sensor_reason2 = sensor_result.get('reason2')
+                    if sensor_reason2:
+                        reason1 = sensor_reason2
+                        print(f"[get_migraine_data] Sensor model reason2 (used as reason1): {reason1}")
                 else:
                     errors.append(f"Sensor model: {sensor_result.get('error', 'Unknown error')}")
             except Exception as e:
