@@ -14,10 +14,20 @@ app = FastAPI(
 # CORS middleware for frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8081", "http://localhost:19006", "http://localhost:3000"],  # Expo default ports
+    allow_origins=[
+        "http://localhost:8081",
+        "http://localhost:8082", 
+        "http://localhost:19006",
+        "http://localhost:3000",
+        "http://localhost:8080",
+        "http://127.0.0.1:8081",
+        "http://127.0.0.1:8082",
+        "http://127.0.0.1:19006",
+        "http://127.0.0.1:3000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*"],  # This includes Authorization header
 )
 
 # Include router (similar to Django's urlpatterns)

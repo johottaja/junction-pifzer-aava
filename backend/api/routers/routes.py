@@ -21,10 +21,10 @@ except ImportError as e:
     predict_fastapi_format = None
 
 try:
-    from sensorDataAi.predict import MigrainePredictionSystem
+    from sensorAiGet import check_migraine_risk, train_user_model_from_db
 except ImportError as e:
-    print(f"Warning: Could not import sensorDataAi.predict: {e}")
-    MigrainePredictionSystem = None
+    print(f"Warning: Could not import sensorAiGet: {e}")
+    check_migraine_risk = None
 
 # Load environment variables
 # Try multiple paths to find .env file
@@ -97,7 +97,7 @@ async def get_user_info(
         )
     
     try:
-        response = supabase.table("users").select("*").eq("id", user_id).execute()
+        response = supabase.table("users").select("*").eq("user_id", user_id).execute()
         
         if not response.data:
             raise HTTPException(
@@ -110,7 +110,7 @@ async def get_user_info(
         return UserInfoResponse(
             success=True,
             user=UserResponse(
-                user_id=user_data.get("id", user_id),
+                user_id=user_data.get("user_id", user_id),
                 email=user_data.get("email"),
                 name=user_data.get("name"),
                 created_at=user_data.get("created_at"),
@@ -143,7 +143,7 @@ async def get_current_user_info(
         )
     
     try:
-        response = supabase.table("users").select("*").eq("id", user_id).execute()
+        response = supabase.table("users").select("*").eq("user_id", user_id).execute()
         
         if not response.data:
             raise HTTPException(
@@ -156,7 +156,7 @@ async def get_current_user_info(
         return UserInfoResponse(
             success=True,
             user=UserResponse(
-                user_id=user_data.get("id", user_id),
+                user_id=user_data.get("user_id", user_id),
                 email=user_data.get("email"),
                 name=user_data.get("name"),
                 created_at=user_data.get("created_at"),
@@ -177,9 +177,7 @@ async def get_current_user_info(
 
 class MigraineDataResponse(BaseModel):
     success: bool
-    user_id: str
-    survey_prediction: Optional[Dict[str, Any]] = None
-    sensor_prediction: Optional[Dict[str, Any]] = None
+    probability: Optional[float] = None  # Percentage value (0-100)
     error: Optional[str] = None
 
 class ReportSubmissionRequest(BaseModel):
@@ -217,10 +215,10 @@ async def get_migraine_data(
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Get migraine prediction data for a user.
-    Combines predictions from survey_model and sensorDataAi.
+    Get migraine prediction probability for a user.
     Route: GET /get-migraine-data/{user_id}
     Requires authentication via session cookie.
+    Returns the migraine risk probability as a percentage (0-100).
     """
     # Verify that the authenticated user can access this user_id
     if current_user.get("id") != user_id:
@@ -229,128 +227,55 @@ async def get_migraine_data(
             detail="You can only access your own migraine data.",
         )
     
-    if not supabase:
+    if not check_migraine_risk:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Supabase is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env file.",
+            detail="Migraine prediction system is not available.",
         )
     
     try:
-        # Fetch user info from Supabase
-        user_response = supabase.table("users").select("*").eq("id", user_id).execute()
-        
-        if not user_response.data:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"User with id {user_id} not found.",
-            )
-        
-        user_data = user_response.data[0]
-        age = user_data.get("age")
-        sex = user_data.get("sex", user_data.get("gender", "male"))  # Try both field names
-        
-        if not age:
+        # Convert user_id to int (check_migraine_risk expects int)
+        try:
+            user_id_int = int(user_id) if isinstance(user_id, str) else user_id
+        except (ValueError, TypeError):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="User age not found. Please update your profile.",
+                detail="Invalid user_id format.",
             )
         
-        # Initialize response
-        response_data = {
-            "success": True,
-            "user_id": user_id,
-            "survey_prediction": None,
-            "sensor_prediction": None,
-            "error": None
-        }
+        # Call check_migraine_risk to get predictio
+        result = check_migraine_risk(user_id_int)
         
-        # ========================================================================
-        # 1. Survey Model Prediction (from survey_model/inference.py)
-        # ========================================================================
-        if predict_fastapi_format:
-            try:
-                # Fetch last 7 days of survey logs from Supabase
-                # Adjust table name based on your Supabase schema
-                survey_logs_response = supabase.table("survey_logs").select("*").eq("user_id", user_id).order("date", desc=True).limit(7).execute()
-                
-                if survey_logs_response.data and len(survey_logs_response.data) >= 7:
-                    # Convert to list of dicts (last 7 days, oldest first)
-                    logs_list = list(reversed(survey_logs_response.data))
-                    
-                    # Run survey model prediction
-                    survey_result = predict_fastapi_format(
-                        logs_list=logs_list,
-                        user_id=user_id,
-                        age=age,
-                        sex=sex
-                    )
-                    response_data["survey_prediction"] = survey_result
-                else:
-                    response_data["error"] = "Insufficient survey data. Need at least 7 days of survey logs."
-                    
-            except Exception as e:
-                print(f"Error in survey prediction: {e}")
-                response_data["error"] = f"Survey prediction error: {str(e)}"
-        else:
-            response_data["error"] = "Survey model not available."
+        print(f"[get_migraine_data] Result from check_migraine_risk: {result}")
         
-        # ========================================================================
-        # 2. Sensor Data Prediction (from sensorDataAi/predict.py)
-        # ========================================================================
-        if MigrainePredictionSystem:
-            try:
-                # Initialize prediction system with correct model path
-                # Adjust path based on your project structure
-                model_path = os.path.join(os.path.dirname(__file__), '../../sensorDataAi/models')
-                prediction_system = MigrainePredictionSystem(model_path=model_path)
-                
-                # Fetch today's sensor data from Supabase
-                # Adjust table name and date field based on your schema
-                from datetime import datetime
-                today = datetime.now().date().isoformat()
-                
-                sensor_data_response = supabase.table("sensor_data").select("*").eq("user_id", user_id).eq("date", today).limit(1).execute()
-                
-                if sensor_data_response.data:
-                    sensor_data = sensor_data_response.data[0]
-                    
-                    # Map Supabase fields to model expected fields
-                    # Adjust field names based on your schema
-                    sensor_dict = {
-                        'Screen_time_h': sensor_data.get('screen_time', 0),
-                        'Average_heart_rate_bpm': sensor_data.get('heart_rate', 0),
-                        'Steps_and_activity': sensor_data.get('steps', 0),
-                        'Sleep_h': sensor_data.get('sleep_hours', 0),
-                        'Stress_level_0_100': sensor_data.get('stress_level', 0),
-                        'Respiration_rate_breaths_min': sensor_data.get('respiration_rate', 0),
-                        'Saa_Temperature_average_C': sensor_data.get('temperature', 0),
-                        'Saa_Air_quality_0_5': sensor_data.get('air_quality', 0),
-                        'Received_Condition_0_3': sensor_data.get('condition', 0),
-                        'Received_Air_Pressure_hPa': sensor_data.get('air_pressure', 0),
-                    }
-                    
-                    # Run sensor model prediction
-                    sensor_result = prediction_system.predict_from_dict(sensor_dict)
-                    response_data["sensor_prediction"] = sensor_result
-                else:
-                    if not response_data.get("error"):
-                        response_data["error"] = "No sensor data available for today."
-                    else:
-                        response_data["error"] += " No sensor data available for today."
-                        
-            except Exception as e:
-                print(f"Error in sensor prediction: {e}")
-                if not response_data.get("error"):
-                    response_data["error"] = f"Sensor prediction error: {str(e)}"
-                else:
-                    response_data["error"] += f" Sensor prediction error: {str(e)}"
-        else:
-            if not response_data.get("error"):
-                response_data["error"] = "Sensor model not available."
-            else:
-                response_data["error"] += " Sensor model not available."
+        # Check if result has an error
+        if 'error' in result:
+            print(f"[get_migraine_data] Error in result: {result.get('error')}")
+            return MigraineDataResponse(
+                success=False,
+                probability=None,
+                error=result.get('error', 'Unknown error occurred')
+            )
         
-        return MigraineDataResponse(**response_data)
+        # Extract probability from result
+        probability = result.get('probability')
+        
+        if probability is None:
+            print(f"[get_migraine_data] Probability not found in result: {result}")
+            return MigraineDataResponse(
+                success=False,
+                probability=None,
+                error="Probability not found in prediction result"
+            )
+        
+        print(f"[get_migraine_data] Returning probability: {probability}")
+        
+        # Return the probability value
+        return MigraineDataResponse(
+            success=True,
+            probability=float(probability),
+            error=None
+        )
         
     except HTTPException:
         raise

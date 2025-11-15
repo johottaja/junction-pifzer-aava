@@ -2,7 +2,7 @@
 Authentication dependencies for FastAPI.
 Similar to Django's authentication decorators/middleware.
 """
-from fastapi import HTTPException, Cookie, status
+from fastapi import HTTPException, Cookie, Header, status
 from typing import Optional
 from supabase import create_client
 import os
@@ -39,9 +39,13 @@ if SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY:
 DEV_TOKEN = "dev-token-12345"
 DEV_USER_ID = "1"  # Default test user ID
 
-async def get_current_user(session_token: Optional[str] = Cookie(None)) -> dict:
+async def get_current_user(
+    session_token: Optional[str] = Cookie(None),
+    authorization: Optional[str] = Header(None)
+) -> dict:
     """
-    Dependency function that checks authentication cookie.
+    Dependency function that checks authentication.
+    Accepts token from either Cookie or Authorization header.
     Similar to Django's @login_required decorator.
     
     Usage in endpoint:
@@ -49,14 +53,25 @@ async def get_current_user(session_token: Optional[str] = Cookie(None)) -> dict:
     async def some_endpoint(current_user: dict = Depends(get_current_user)):
         ...
     """
-    if not session_token:
+    # Try to get token from header first (for React Native), then cookie
+    token = None
+    if authorization:
+        # Support "Bearer <token>" or just "<token>"
+        if authorization.startswith("Bearer "):
+            token = authorization[7:]
+        else:
+            token = authorization
+    elif session_token:
+        token = session_token
+    
+    if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication required. Please log in.",
+            detail="Authentication required. Please provide a token.",
         )
     
     # Development mode: Check for hardcoded dev token first
-    if session_token == DEV_TOKEN:
+    if token == DEV_TOKEN:
         return {
             "id": DEV_USER_ID,
             "email": "dev@test.com",
@@ -74,7 +89,7 @@ async def get_current_user(session_token: Optional[str] = Cookie(None)) -> dict:
     try:
         # Verify the session token with Supabase Auth
         # Note: You may need to adjust this based on your Supabase Auth setup
-        user_data = supabase.auth.get_user(session_token)
+        user_data = supabase.auth.get_user(token)
         
         if not user_data:
             raise HTTPException(

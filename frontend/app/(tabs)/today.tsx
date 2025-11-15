@@ -15,23 +15,107 @@ const hexToRgba = (hex: string, alpha: number): string => {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
-// Mock API functions
-const fetchMigraineRisk = async (): Promise<{
+// API configuration
+// For React Native/Expo: Use your computer's IP address instead of localhost
+// Find your IP: Windows (ipconfig), Mac/Linux (ifconfig)
+// Example: 'http://192.168.1.100:8000'
+// For web/emulator, you can try: 'http://localhost:8000' or 'http://10.0.2.2:8000' (Android emulator)
+const API_BASE_URL = __DEV__ 
+  ? 'http://localhost:8000' // Change to your IP address for physical device
+  : 'https://your-production-api.com'; // Production URL
+const DEV_TOKEN = 'dev-token-12345'; // Development token
+
+// Helper function to determine risk level from percentage
+const getRiskLevelFromPercentage = (percentage: number): 'low' | 'medium' | 'high' => {
+  if (percentage < 40) return 'low';
+  if (percentage < 60) return 'medium';
+  return 'high';
+};
+
+// Helper function to generate message from percentage
+const getMessageFromPercentage = (percentage: number): string => {
+  if (percentage < 20) {
+    return 'Your migraine risk is very low today. Continue monitoring your health.';
+  } else if (percentage < 40) {
+    return 'Your migraine risk is low today. Maintain good sleep and hydration.';
+  } else if (percentage < 60) {
+    return 'Your migraine risk is moderate today. Consider taking preventive measures.';
+  } else if (percentage < 80) {
+    return 'Your migraine risk is high today. Avoid known triggers and ensure adequate rest.';
+  } else {
+    return 'Your migraine risk is very high today. Take preventive measures and consult your doctor.';
+  }
+};
+
+// Fetch migraine risk from backend API
+const fetchMigraineRisk = async (userId: string = '1'): Promise<{
   riskLevel: 'low' | 'medium' | 'high';
   riskPercentage: number;
   factors: string[];
   message: string;
 }> => {
-  // Simulate API call delay
-  await new Promise(resolve => setTimeout(resolve, 500));
-  
-  // Hardcoded mock response
-  return {
-    riskLevel: 'medium',
-    riskPercentage: 45,
-    factors: ['Weather changes', 'Stress levels elevated', 'Sleep quality decreased'],
-    message: 'Your migraine risk is moderate today. Consider taking preventive measures.',
-  };
+  try {
+    console.log(`[fetchMigraineRisk] Calling API: ${API_BASE_URL}/get-migraine-data/${userId}`);
+    
+    const response = await fetch(`${API_BASE_URL}/get-migraine-data/${userId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': DEV_TOKEN, // Use Authorization header (React Native compatible)
+      },
+    });
+
+    console.log(`[fetchMigraineRisk] Response status: ${response.status}`);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[fetchMigraineRisk] API error response:`, errorText);
+      throw new Error(`API error: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    
+    console.log('[fetchMigraineRisk] Response data:', data);
+
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to fetch migraine data');
+    }
+
+    // Extract percentage from response (already a percentage 0-100)
+    let riskPercentage = 0;
+    let factors: string[] = [];
+
+    if (data.probability !== undefined && data.probability !== null) {
+      // Probability is already a percentage (0-100)
+      riskPercentage = Math.round(data.probability);
+      console.log('[fetchMigraineRisk] Extracted probability:', riskPercentage);
+    } else {
+      // No probability available
+      throw new Error(data.error || 'No prediction data available');
+    }
+
+    const riskLevel = getRiskLevelFromPercentage(riskPercentage);
+    const message = getMessageFromPercentage(riskPercentage);
+
+    return {
+      riskLevel,
+      riskPercentage,
+      factors,
+      message,
+    };
+  } catch (error) {
+    console.error('[fetchMigraineRisk] Error details:', error);
+    console.error('[fetchMigraineRisk] Error type:', error instanceof Error ? error.constructor.name : typeof error);
+    console.error('[fetchMigraineRisk] Error message:', error instanceof Error ? error.message : String(error));
+    
+    // Return default/fallback values on error
+    return {
+      riskLevel: 'medium',
+      riskPercentage: 45,
+      factors: ['Unable to fetch prediction data'],
+      message: `Unable to load migraine risk data: ${error instanceof Error ? error.message : 'Network error'}. Please check your connection and try again.`,
+    };
+  }
 };
 
 const fetchRecommendedActions = async (): Promise<{
@@ -156,8 +240,12 @@ export default function TodayScreen() {
     const loadData = async () => {
       setLoading(true);
       try {
+        // TODO: Get actual user_id from auth context/session
+        // For now, using hardcoded user_id '1' (matches dev token)
+        const userId = '1';
+        
         const [riskResponse, actionsResponse, forecastResponse] = await Promise.all([
-          fetchMigraineRisk(),
+          fetchMigraineRisk(userId),
           fetchRecommendedActions(),
           fetchWeeklyRiskForecast(),
         ]);
