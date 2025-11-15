@@ -231,116 +231,15 @@ export default function TodayScreen() {
                   borderColor: hexToRgba(getRiskColor(riskData.riskLevel), 0.25),
                 }}
               >
-                <IconSymbol name={getRiskIcon(riskData.riskLevel)} size={28} color={getRiskColor(riskData.riskLevel)} />
-                <ThemedView style={styles.riskContent}>
-                  <ThemedView style={styles.riskHeader}>
-                    <ThemedText style={{ ...styles.riskTitle, color: getRiskColor(riskData.riskLevel) }}>
-                      {riskData.riskLevel.charAt(0).toUpperCase() + riskData.riskLevel.slice(1)} Risk Today
-                    </ThemedText>
-                    <ThemedText style={{ ...styles.riskPercentage, color: getRiskColor(riskData.riskLevel) }}>
-                      {riskData.riskPercentage}%
-                    </ThemedText>
-                  </ThemedView>
+                <ThemedView style={styles.riskMessageContainer}>
                   <ThemedText style={{ ...styles.riskMessage, color: theme.text }}>
                     {riskData.message}
                   </ThemedText>
                 </ThemedView>
-              </ThemedView>
-            )}
-
-            {weeklyForecast.length > 0 && (
-              <ThemedView style={styles.section}>
-                <ThemedText type="subtitle" style={styles.sectionTitle}>Today & Tomorrow</ThemedText>
-                <ThemedView
-                  style={{
-                    ...styles.calendarCard,
-                    backgroundColor: "transparent",
-                    borderColor: theme.cardBorder,
-                  }}
-                >
-                  {weeklyForecast.map((day, index) => {
-                    const isToday = index === 0;
-                    const isTomorrow = index === 1;
-                    const riskColor = getRiskColor(day.riskLevel);
-                    return (
-                      <ThemedView
-                        key={day.date}
-                        style={{
-                          ...styles.calendarDay,
-                          backgroundColor: 'transparent',
-                          borderColor: theme.primaryDark,
-                          borderWidth: 1,
-                          borderRadius: 12,
-                          ...(index !== weeklyForecast.length - 1 && {
-                            marginRight: 12,
-                            paddingRight: 12,
-                            backgroundColor: "transparent",
-                          }),
-                        }}
-                      >
-                        <ThemedView style={{ ...styles.dayHeader, backgroundColor: "transparent" }}>
-                          <ThemedView style={{ ...styles.dayInfo, backgroundColor: "transparent" }}>
-                            <ThemedText style={{ ...styles.dayName, color: isToday ? theme.primary : theme.text }}>
-                              {day.dayName}
-                            </ThemedText>
-                            <ThemedText style={{ ...styles.dayDate, color: theme.textSecondary }}>
-                              {day.dayNumber}
-                            </ThemedText>
-                            <ThemedView style={styles.badgeContainer}>
-                              {isToday && (
-                                <ThemedView
-                                  style={{
-                                    ...styles.todayBadge,
-                                    backgroundColor: hexToRgba(theme.primary, 0.12),
-                                  }}
-                                >
-                                  <ThemedText style={{ ...styles.todayBadgeText, color: theme.primary }}>
-                                    Today
-                                  </ThemedText>
-                                </ThemedView>
-                              )}
-                              {isTomorrow && (
-                                <ThemedView
-                                  style={{
-                                    ...styles.todayBadge,
-                                    backgroundColor: hexToRgba(theme.primary, 0.12),
-                                  }}
-                                >
-                                  <ThemedText style={{ ...styles.todayBadgeText, color: theme.primary }}>
-                                    Tomorrow
-                                  </ThemedText>
-                                </ThemedView>
-                              )}
-                            </ThemedView>
-                          </ThemedView>
-                        </ThemedView>
-                        <ThemedView style={{ ...styles.riskIndicator, backgroundColor: "transparent" }}>
-                          <ThemedView
-                            style={{
-                              ...styles.riskBar,
-                              backgroundColor: hexToRgba(riskColor, 0.15),
-                            }}
-                          >
-                            <ThemedView
-                              style={{
-                                ...styles.riskBarFill,
-                                width: `${day.riskPercentage}%`,
-                                backgroundColor: riskColor,
-                              }}
-                            />
-                          </ThemedView>
-                          <ThemedView style={styles.riskInfo}>
-                            <ThemedText style={{ ...styles.riskLabel, color: riskColor }}>
-                              {day.riskLevel.charAt(0).toUpperCase() + day.riskLevel.slice(1)}
-                            </ThemedText>
-                            <ThemedText style={{ ...styles.riskPercent, color: theme.textSecondary }}>
-                              {day.riskPercentage}%
-                            </ThemedText>
-                          </ThemedView>
-                        </ThemedView>
-                      </ThemedView>
-                    );
-                  })}
+                <ThemedView style={styles.riskPercentageContainer}>
+                  <ThemedText style={{ ...styles.riskPercentage, color: theme.primaryDark }}>
+                    {riskData.riskPercentage}%
+                  </ThemedText>
                 </ThemedView>
               </ThemedView>
             )}
@@ -425,32 +324,29 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     marginBottom: 24,
-    gap: 16,
-    alignItems: 'flex-start',
+    gap: 20,
+    alignItems: 'center',
+    minHeight: 100,
   },
-  riskContent: {
+  riskMessageContainer: {
     flex: 1,
     backgroundColor: "transparent",
+    justifyContent: 'center',
   },
-  riskHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  riskPercentageContainer: {
     alignItems: 'center',
-    marginBottom: 8,
+    justifyContent: 'center',
+    minWidth: 120,
     backgroundColor: "transparent",
   },
-  riskTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
   riskPercentage: {
-    fontSize: 24,
-    fontWeight: '700',
+    fontSize: 48,
+    fontWeight: '800',
+    lineHeight: 56,
   },
   riskMessage: {
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 12,
+    fontSize: 15,
+    lineHeight: 22,
   },
   timeWindowContainer: {
     flexDirection: 'row',
