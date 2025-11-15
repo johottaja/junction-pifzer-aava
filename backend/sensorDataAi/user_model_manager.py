@@ -270,6 +270,67 @@ class UserModelManager:
         
         return probability
     
+    def get_top_risk_factors(self, user_id, data_dict, top_n=2):
+        """Get top N risk factors contributing to migraine prediction"""
+        user_id = int(user_id)
+        if not self.user_has_model(user_id):
+            raise FileNotFoundError(f"No trained model found for user '{user_id}'.")
+        
+        model, scaler = self.load_user_model(user_id)
+        
+        feature_importance = model.feature_importances_
+        importance_dict = dict(zip(self.feature_names, feature_importance))
+        
+        thresholds = {
+            'Screen_time_h': 8.0,
+            'Average_heart_rate_bpm': 80.0,
+            'Steps_and_activity': 5000.0,
+            'Sleep_h': 6.5,
+            'Stress_level_0_100': 70.0,
+            'Respiration_rate_breaths_min': 18.0,
+            'Saa_Temperature_average_C': 27.0,
+            'Saa_Air_quality_0_5': 3.0,
+            'Received_Condition_0_3': 2.0,
+            'Received_Air_Pressure_hPa': 1010.0
+        }
+        
+        risk_scores = []
+        for feature, importance in importance_dict.items():
+            value = data_dict.get(feature, 0)
+            threshold = thresholds.get(feature, 0)
+            
+            if feature == 'Sleep_h':
+                deviation = max(0, threshold - value)
+            elif feature == 'Steps_and_activity':
+                deviation = max(0, threshold - value) / 1000.0
+            else:
+                deviation = max(0, value - threshold)
+            
+            risk_score = importance * (1 + deviation)
+            risk_scores.append((feature, risk_score, value))
+        
+        risk_scores.sort(key=lambda x: x[1], reverse=True)
+        
+        readable_names = {
+            'Screen_time_h': 'High screen time',
+            'Average_heart_rate_bpm': 'Elevated heart rate',
+            'Steps_and_activity': 'Low physical activity',
+            'Sleep_h': 'Insufficient sleep',
+            'Stress_level_0_100': 'High stress level',
+            'Respiration_rate_breaths_min': 'Elevated respiration rate',
+            'Saa_Temperature_average_C': 'High temperature',
+            'Saa_Air_quality_0_5': 'Poor air quality',
+            'Received_Condition_0_3': 'Weather conditions',
+            'Received_Air_Pressure_hPa': 'Air pressure changes'
+        }
+        
+        top_factors = []
+        for feature, score, value in risk_scores[:top_n]:
+            readable = readable_names.get(feature, feature)
+            top_factors.append(f"{readable} ({value:.1f})")
+        
+        return top_factors
+    
     def list_all_users(self):
         """List all users with models or data"""
         users_with_data = set()
