@@ -51,7 +51,7 @@ days_data = [
 ]
 
 # Make prediction
-result = predict_migraine('patient123', days_data=days_data, explain=False)
+result = predict_migraine(123, days_data=days_data, explain=False)
 
 # Print only the percentage
 print(f"{result['probability']:.1f}%")

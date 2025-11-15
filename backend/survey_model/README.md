@@ -29,7 +29,7 @@ from inference import predict_migraine_probability
 import pandas as pd
 
 logs_df = pd.read_excel("path/to/logs.xlsx")
-probability = predict_migraine_probability(logs_df, user_id="CM-001", age=46, sex="female")
+probability = predict_migraine_probability(logs_df, user_id="CM-001", age=46, gender="female")
 print(f"Migraine probability: {probability:.3f}")
 ```
 
@@ -47,7 +47,7 @@ user_data_list = [
     {
         'Unique ID': 'CM-001',
         'Age': 46,
-        'Sex': 'female',
+        'gender': 'female',
         'Date': 20240101,
         'Stress': 1,
         'Sleep deprivation': 0,
@@ -82,7 +82,7 @@ probability, top_features = predict_migraine_probability(
     logs_df, 
     user_id="CM-001", 
     age=46, 
-    sex="female",
+    gender="female",
     return_interpretation=True
 )
 ```
@@ -94,7 +94,7 @@ The inference automatically uses user-specific model if available, otherwise fal
 - **Algorithm**: RandomForest (100 trees, max_depth=15)
 - **Target**: Binary classification (Migraine: 0 or 1)
 - **Features**: 20+ features including:
-  - Demographics: Age, Sex
+  - Demographics: Age, Gender (from user profile, not survey table)
   - Daily survey responses: Stress, Sleep, Exercise, etc.
   - User-specific patterns: Historical averages and std dev
 - **Class balancing**: `class_weight='balanced'` to reduce false negatives

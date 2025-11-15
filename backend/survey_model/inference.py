@@ -1,25 +1,23 @@
 """
-Inference script: takes 7 days of survey logs with user info and returns migraine probability.
-Includes interpretability - shows top 5 features contributing to each prediction.
+Inference script: takes 7 days of survey logs and returns migraine probability.
+Uses config.py for column names. Prioritizes current day and previous day.
+Supports JSON input from Supabase API.
 """
 import pandas as pd
 import numpy as np
 import joblib
 import os
+import json
+from datetime import datetime
+from config import (
+    USER_ID_COL, MIGRAINE_COL, AGE_COL, GENDER_COL, DATE_COL,
+    SURVEY_FEATURES, EXCLUDE_COLS
+)
 
 MODEL_PATH = "models/best_model.pkl"
 
 def load_model(user_id=None):
-    """
-    Load model - user-specific if available, otherwise base model.
-    
-    Args:
-        user_id: User identifier. If provided, checks for user-specific model.
-    
-    Returns:
-        Tuple: (model, feature_names, label_encoder_sex)
-    """
-    # Try to load user-specific model first
+    """Load model - user-specific if available, otherwise base model."""
     if user_id:
         from retrain_user_model import has_user_model, load_user_model
         if has_user_model(user_id):
@@ -28,47 +26,37 @@ def load_model(user_id=None):
             return (
                 user_model_data['model'],
                 user_model_data.get('feature_names', None),
-                user_model_data.get('label_encoder_sex', None)
+                user_model_data.get('label_encoder_gender', None)
             )
     
-    # Fall back to base model
     if os.path.exists(MODEL_PATH):
         model_data = joblib.load(MODEL_PATH)
         if isinstance(model_data, dict):
             return (
-                model_data['model'], 
+                model_data['model'],
                 model_data.get('feature_names', None),
-                model_data.get('label_encoder_sex', None)
+                model_data.get('label_encoder_gender', None)
             )
         else:
             return model_data, None, None
     
     raise FileNotFoundError(
-        f"Model not found at {MODEL_PATH}. Please run compare_models.py or train_base_model.py first."
+        f"Model not found at {MODEL_PATH}. Please run train_base_model.py first."
     )
 
 def create_user_features(logs_df, user_id, exclude_last=True):
-    """
-    Create user-specific aggregated features from historical logs.
-    Uses survey response patterns, not Frequency.
-    Excludes the last day to avoid data leakage.
-    """
-    user_data = logs_df[logs_df['Unique ID'] == user_id] if 'Unique ID' in logs_df.columns else logs_df
+    """Create user-specific aggregated features from historical logs."""
+    if USER_ID_COL not in logs_df.columns:
+        raise ValueError(f"'{USER_ID_COL}' column not found. Update config.py to match your data.")
+    user_data = logs_df[logs_df[USER_ID_COL] == user_id]
     
-    # Exclude last day for user stats (to avoid leakage)
     if exclude_last and len(user_data) > 1:
         historical_data = user_data.iloc[:-1]
     else:
         historical_data = user_data
     
-    # Calculate user's typical survey response patterns
-    survey_features = [
-        'Stress', 'Sleep deprivation', 'Exercise', 'Physical fatigue',
-        'Weather/temperature change', 'Noise', 'Excess caffeinated drinks',
-        'Oversleeping', 'Extreme emotional changes'
-    ]
-    
-    available_features = [f for f in survey_features if f in historical_data.columns]
+    # Use survey features from config
+    available_features = [f for f in SURVEY_FEATURES if f in historical_data.columns]
     
     user_features = {}
     for feat in available_features:
@@ -81,58 +69,59 @@ def create_user_features(logs_df, user_id, exclude_last=True):
     
     return user_features
 
-def prepare_features(logs_df, user_id, age, sex, feature_names, le_sex):
+def prepare_features(logs_df, user_id, age, gender, feature_names, le_gender):
     """
     Prepare features from 7 days of survey logs with personalization.
-    
-    Args:
-        logs_df: DataFrame with survey data for 7 days
-        user_id: User identifier
-        age: User's age
-        sex: User's sex (string: 'male' or 'female')
-        feature_names: List of feature names in the order expected by the model
-        le_sex: LabelEncoder for Sex
-    
-    Returns:
-        DataFrame with features ready for prediction
+    Prioritizes current day (60%) and previous day (40%).
     """
-    # Use the most recent day's data (last row)
     if len(logs_df) == 0:
         raise ValueError("logs_df is empty")
     
-    # Get most recent day
-    latest_day = logs_df.iloc[-1:].copy()
+    # Sort by created_at if available (for proper day prioritization)
+    if DATE_COL in logs_df.columns:
+        logs_df = logs_df.sort_values(DATE_COL).reset_index(drop=True)
     
-    # Create user-specific features
+    # Ensure exactly 7 days (most recent last)
+    logs_df = logs_df.tail(7).reset_index(drop=True)
+    
+    # Get current day (day 7) and previous day (day 6)
+    current_day = logs_df.iloc[-1:].copy()
+    previous_day = logs_df.iloc[-2:-1].copy() if len(logs_df) > 1 else current_day
+    
+    # Create user-specific features (from days 1-6, excluding current day)
     user_features = create_user_features(logs_df, user_id)
     
-    # Prepare feature dictionary
     features_dict = {}
     
-    # Add Age
-    features_dict['Age'] = age
+    # Add Age (if model expects it - may not be in Supabase survey table)
+    if AGE_COL in feature_names:
+        features_dict[AGE_COL] = age if age is not None else 0
     
-    # Add Sex (encoded)
-    if le_sex is not None:
-        try:
-            features_dict['Sex_encoded'] = le_sex.transform([sex])[0]
-        except:
-            # Fallback: use most common encoding
-            features_dict['Sex_encoded'] = 0
-    else:
-        features_dict['Sex_encoded'] = 0 if sex.lower() == 'male' else 1
+    # Add Gender (encoded) - if model expects it
+    if 'gender_encoded' in feature_names:
+        if le_gender is not None:
+            try:
+                features_dict['gender_encoded'] = le_gender.transform([gender])[0] if gender else 0
+            except:
+                features_dict['gender_encoded'] = 0
+        else:
+            features_dict['gender_encoded'] = 0 if (gender and gender.lower() == 'male') else 1
     
     # Add user-specific features
     features_dict.update(user_features)
     
-    # Add survey features from latest day
-    exclude_cols = ['Unique ID', 'Date', 'Frequency', 'Migraine', 'target', 'Sex', 'Age']
-    # Also exclude user_* columns that might be in latest_day
-    exclude_cols.extend([col for col in latest_day.columns if col.startswith('user_')])
+    # Add survey features with day prioritization
+    # Current day gets 60% weight, previous day gets 40% weight
+    exclude_cols = EXCLUDE_COLS + [col for col in logs_df.columns if col.startswith('user_')]
+    # Only include survey features from config (Supabase boolean columns)
+    survey_cols = [col for col in SURVEY_FEATURES if col in logs_df.columns]
     
-    for col in latest_day.columns:
-        if col not in exclude_cols:
-            features_dict[col] = latest_day[col].iloc[0] if col in latest_day.columns else 0
+    for col in survey_cols:
+        current_val = current_day[col].iloc[0] if col in current_day.columns else 0
+        prev_val = previous_day[col].iloc[0] if col in previous_day.columns and len(previous_day) > 0 else 0
+        
+        # Weighted: 60% current day, 40% previous day
+        features_dict[col] = 0.6 * current_val + 0.4 * prev_val
     
     # Create DataFrame
     features_df = pd.DataFrame([features_dict])
@@ -141,92 +130,68 @@ def prepare_features(logs_df, user_id, age, sex, feature_names, le_sex):
     if feature_names:
         missing = set(feature_names) - set(features_df.columns)
         if missing:
-            # Fill missing features with 0
             for feat in missing:
                 features_df[feat] = 0
-        
-        # Reorder to match training
         features_df = features_df[feature_names]
     
-    # Handle missing values
     features_df = features_df.fillna(0)
     
     return features_df
 
 def get_top_features_contribution(model, features_df, feature_names, top_k=5):
-    """
-    Calculate top K features contributing to this prediction.
-    Handles both RandomForest (feature_importances_) and LogisticRegression (coefficients).
-    
-    Args:
-        model: Trained model (RandomForest or LogisticRegression)
-        features_df: Single row DataFrame with features
-        feature_names: List of feature names
-        top_k: Number of top features to return
-    
-    Returns:
-        List of tuples: (feature_name, contribution_score, feature_value)
-    """
-    # Get feature values for this prediction
+    """Calculate top K features contributing to this prediction."""
     feature_values = features_df.iloc[0].values
     
     # Get global importance based on model type
     if hasattr(model, 'feature_importances_'):
         # RandomForest: use feature importances
         global_importance = model.feature_importances_
+        contributions = []
+        for i, feat_name in enumerate(feature_names):
+            global_imp = global_importance[i]
+            local_val = feature_values[i]
+            contribution_score = global_imp * abs(local_val)
+            contributions.append((feat_name, contribution_score, local_val))
     elif hasattr(model, 'coef_'):
-        # LogisticRegression: use absolute coefficients as importance
-        # For binary classification, coef_ is shape (1, n_features)
+        # LogisticRegression: use actual coefficient * feature_value (contribution to log-odds)
         coef = model.coef_[0] if model.coef_.ndim > 1 else model.coef_
-        # Normalize coefficients to 0-1 range for consistency
-        coef_abs = np.abs(coef)
-        global_importance = coef_abs / (coef_abs.max() + 1e-10) if coef_abs.max() > 0 else coef_abs
+        contributions = []
+        for i, feat_name in enumerate(feature_names):
+            coefficient = coef[i]
+            local_val = feature_values[i]
+            # Actual contribution to log-odds: coefficient * feature_value
+            contribution_score = abs(coefficient * local_val)
+            contributions.append((feat_name, contribution_score, local_val))
     else:
-        # Fallback: equal importance
-        global_importance = np.ones(len(feature_names))
+        # Fallback: use feature values as importance
+        contributions = []
+        for i, feat_name in enumerate(feature_names):
+            local_val = feature_values[i]
+            contribution_score = abs(local_val)
+            contributions.append((feat_name, contribution_score, local_val))
     
-    # Calculate local contribution score
-    # Score = global_importance * abs(feature_value)
-    # This highlights features that are both important globally and have non-zero values
-    contributions = []
-    for i, feat_name in enumerate(feature_names):
-        global_imp = global_importance[i]
-        local_val = feature_values[i]
-        
-        # Contribution score: importance weighted by absolute value
-        # For binary features (0/1), this works well
-        # For continuous, we use absolute value
-        contribution_score = global_imp * abs(local_val)
-        
-        contributions.append((feat_name, contribution_score, local_val))
-    
-    # Sort by contribution score
     contributions.sort(key=lambda x: x[1], reverse=True)
-    
     return contributions[:top_k]
 
-def predict_migraine_probability(logs_df, user_id, age, sex, return_interpretation=False):
+def predict_migraine_probability(logs_df, user_id, age=None, gender=None, return_interpretation=False):
     """
-    Predict migraine probability for today based on 7 days of logs with personalization.
-    Uses user-specific model if available, otherwise uses base model.
+    Predict migraine probability for today based on 7 days of logs.
     
     Args:
-        logs_df: DataFrame with 7 days of survey data
-        user_id: User identifier (string)
-        age: User's age (int)
-        sex: User's sex (string: 'male' or 'female')
+        logs_df: DataFrame with 7 days of survey data (must have DATE_COL for sorting)
+        user_id: User identifier (string or int) - used for user-specific models
+        age: User's age (int, optional - may come from user profile)
+        gender: User's gender (string, optional - may come from user profile)
         return_interpretation: If True, also return top contributing features
     
     Returns:
         float: Probability of migraine (0-1)
         OR tuple: (probability, top_features) if return_interpretation=True
     """
-    model, feature_names, le_sex = load_model(user_id=user_id)
+    model, feature_names, le_gender = load_model(user_id=user_id)
     
-    # Prepare features with personalization
-    features = prepare_features(logs_df, user_id, age, sex, feature_names, le_sex)
+    features = prepare_features(logs_df, user_id, age, gender, feature_names, le_gender)
     
-    # Predict probability
     probability = model.predict_proba(features)[0, 1]
     
     if return_interpretation:
@@ -235,54 +200,131 @@ def predict_migraine_probability(logs_df, user_id, age, sex, return_interpretati
     else:
         return float(probability)
 
-def predict_from_dict(logs_list, user_id, age, sex, return_interpretation=False):
+def predict_from_dict(logs_list, user_id, age=None, gender=None, return_interpretation=False):
     """
     Convenience function: predict from list of daily log dictionaries.
     FastAPI/Flask ready - accepts list of dicts directly.
     
     Args:
-        logs_list: List of 7 dictionaries, each representing one day's survey data
-        user_id: User identifier
-        age: User's age
-        sex: User's sex
-        return_interpretation: If True, also return top contributing features
+        logs_list: List of dicts, each representing a day's survey response
+        user_id: User identifier (string or int)
+        age: User's age (int, optional)
+        gender: User's gender (string, optional)
+        return_interpretation: If True, return top features
     
-    Returns:
-        float: Probability of migraine (0-1)
-        OR tuple: (probability, top_features) if return_interpretation=True
+    Note: logs_list should be sorted by created_at (most recent last) for proper day weighting.
     """
     logs_df = pd.DataFrame(logs_list)
-    # Ensure user_id is in the dataframe
-    if 'Unique ID' not in logs_df.columns:
-        logs_df['Unique ID'] = user_id
-    return predict_migraine_probability(logs_df, user_id, age, sex, return_interpretation)
+    
+    # Ensure user_id column exists
+    if USER_ID_COL not in logs_df.columns:
+        logs_df[USER_ID_COL] = user_id
+    
+    # Sort by created_at if available (for day prioritization)
+    if DATE_COL in logs_df.columns:
+        logs_df = logs_df.sort_values(DATE_COL).reset_index(drop=True)
+    
+    return predict_migraine_probability(logs_df, user_id, age, gender, return_interpretation)
 
-def predict_fastapi_format(logs_list, user_id, age, sex):
+def predict_from_json(json_data, user_id=None, age=None, gender=None):
+    """
+    Predict from JSON input (Supabase API format).
+    Accepts JSON string or dict/list and handles type conversions.
+    
+    Args:
+        json_data: JSON string, dict, or list of dicts from Supabase API
+        user_id: User identifier (int, optional - extracted from json_data if not provided)
+        age: User's age (int, optional - from user profile or json_data)
+        gender: User's gender (string, optional - from user profile or json_data)
+    
+    Returns:
+        dict: FastAPI-ready JSON response with probability and top features
+    """
+    # Parse JSON if string
+    if isinstance(json_data, str):
+        data = json.loads(json_data)
+    else:
+        data = json_data
+    
+    # Handle different JSON structures
+    if isinstance(data, dict):
+        # Single record or wrapped structure
+        if 'logs' in data or 'data' in data:
+            logs_list = data.get('logs', data.get('data', []))
+        elif isinstance(data.get('items'), list):
+            logs_list = data['items']
+        else:
+            # Single record - wrap in list
+            logs_list = [data]
+    elif isinstance(data, list):
+        logs_list = data
+    else:
+        raise ValueError(f"Invalid JSON format. Expected dict or list, got {type(data)}")
+    
+    if not logs_list or len(logs_list) == 0:
+        raise ValueError("Empty logs list. Need at least 1 day of data.")
+    
+    # Extract user_id, age, gender from first record if not provided
+    first_record = logs_list[0]
+    if user_id is None:
+        user_id = first_record.get(USER_ID_COL) or first_record.get('user_id')
+        if user_id is None:
+            raise ValueError(f"user_id not found in JSON data and not provided as parameter")
+    
+    if age is None:
+        age = first_record.get(AGE_COL) or first_record.get('age')
+    
+    if gender is None:
+        gender = first_record.get(GENDER_COL) or first_record.get('gender')
+    
+    # Convert JSON data to proper format
+    converted_logs = []
+    for record in logs_list:
+        converted = {}
+        
+        # Convert boolean fields (Supabase returns true/false, we need 1/0)
+        for key, value in record.items():
+            if isinstance(value, bool):
+                converted[key] = 1 if value else 0
+            elif value is None:
+                converted[key] = 0
+            elif key == DATE_COL or key == 'created_at':
+                # Handle date conversion if needed
+                if isinstance(value, str):
+                    # Try to parse date string, but keep as string if it fails
+                    try:
+                        # Try common formats
+                        datetime.fromisoformat(value.replace('Z', '+00:00'))
+                        converted[key] = value
+                    except:
+                        converted[key] = value
+                else:
+                    converted[key] = value
+            else:
+                converted[key] = value
+        
+        converted_logs.append(converted)
+    
+    # Ensure we have exactly 7 days (take last 7 if more)
+    if len(converted_logs) > 7:
+        converted_logs = converted_logs[-7:]
+    
+    # Use existing predict_from_dict function
+    return predict_fastapi_format(converted_logs, user_id, age, gender)
+
+def predict_fastapi_format(logs_list, user_id, age=None, gender=None):
     """
     FastAPI-ready prediction function.
     Accepts list of dicts and returns JSON-serializable response.
     
     Args:
-        logs_list: List of 7 dictionaries (previous days' survey responses)
-        user_id: User identifier (string)
-        age: User's age (int)
-        sex: User's sex (string: 'male' or 'female')
-    
-    Returns:
-        dict: {
-            'probability': float (0-1),
-            'top_features': [
-                {
-                    'feature': str,
-                    'value': float,
-                    'contribution': float
-                },
-                ...
-            ]
-        }
+        logs_list: List of dicts with survey responses (sorted by created_at, most recent last)
+        user_id: User identifier (string or int)
+        age: User's age (int, optional - from user profile)
+        gender: User's gender (string, optional - from user profile)
     """
     probability, top_features = predict_from_dict(
-        logs_list, user_id, age, sex, return_interpretation=True
+        logs_list, user_id, age, gender, return_interpretation=True
     )
     
     return {
@@ -297,75 +339,59 @@ def predict_fastapi_format(logs_list, user_id, age, sex):
         ]
     }
 
-def format_interpretation(probability, top_features):
-    """
-    Format interpretation results for display.
-    
-    Args:
-        probability: Predicted probability
-        top_features: List of (feature_name, contribution_score, feature_value) tuples
-    
-    Returns:
-        Formatted string
-    """
-    result = f"Predicted Migraine Probability: {probability:.3f}\n\n"
-    result += "Top 5 Contributing Features:\n"
-    result += "-" * 60 + "\n"
-    
-    for i, (feat_name, contrib_score, feat_value) in enumerate(top_features, 1):
-        # Format feature value
-        if isinstance(feat_value, (int, float)):
-            if feat_value == int(feat_value):
-                value_str = str(int(feat_value))
-            else:
-                value_str = f"{feat_value:.2f}"
-        else:
-            value_str = str(feat_value)
-        
-        result += f"{i}. {feat_name:35s} | Value: {value_str:8s} | Contribution: {contrib_score:.4f}\n"
-    
-    return result
-
 if __name__ == "__main__":
-    # Example usage
     print("=== Example: Predicting from sample data ===\n")
     
-    # Load some sample data for testing
     try:
         print("Loading data...")
-        data_path = "pretrain_data/survey_data.xlsx"
+        data_path = "pretrain_data/survey_base_data.xlsx"
         df = pd.read_excel(data_path)
         
         print("Preparing user data...")
-        # Get last 7 days for a user
-        user_id = df['Unique ID'].iloc[0]
-        user_data = df[df['Unique ID'] == user_id].tail(7)
-        age = user_data['Age'].iloc[0]
-        sex = user_data['Sex'].iloc[0]
+        user_id = df[USER_ID_COL].iloc[0]
+        user_data = df[df[USER_ID_COL] == user_id].tail(7)
+        age = user_data[AGE_COL].iloc[0] if AGE_COL in user_data.columns else None
+        gender = user_data[GENDER_COL].iloc[0] if GENDER_COL in user_data.columns else None
         
-        print(f"User: {user_id} (Age: {age}, Sex: {sex})\n")
+        print(f"User: {user_id} (Age: {age}, Gender: {gender})\n")
         
         print("Predicting (simple)...")
-        # First test without interpretation
         probability = predict_migraine_probability(
-            user_data, user_id, age, sex, return_interpretation=False
+            user_data, user_id, age, gender, return_interpretation=False
         )
         print(f"Probability: {probability:.3f}\n")
         
         print("Predicting (with interpretation)...")
-        # Then test with interpretation
         probability, top_features = predict_migraine_probability(
-            user_data, user_id, age, sex, return_interpretation=True
+            user_data, user_id, age, gender, return_interpretation=True
         )
         
-        # Display results
-        print(format_interpretation(probability, top_features))
+        print(f"Predicted Migraine Probability: {probability:.3f}\n")
+        print("Top 5 Contributing Features:")
+        for i, (feat, score, val) in enumerate(top_features, 1):
+            print(f"  {i}. {feat}: {val} (contribution: {score:.4f})")
+        
+        print("\n" + "=" * 60)
+        print("Example: Predicting from JSON (Supabase format)")
+        print("=" * 60)
+        
+        # Convert to JSON format (simulating Supabase API response)
+        logs_json = user_data.to_dict('records')
+        # Convert booleans to true/false for JSON
+        for record in logs_json:
+            for key, value in record.items():
+                if isinstance(value, (int, float)) and key in SURVEY_FEATURES:
+                    record[key] = bool(value)
+        
+        json_string = json.dumps(logs_json)
+        print(f"\nJSON input (first 200 chars): {json_string[:200]}...")
+        
+        result = predict_from_json(json_string, user_id=user_id, age=age, gender=gender)
+        print(f"\nResult from JSON:")
+        print(f"  Probability: {result['probability']:.4f}")
+        print(f"  Top feature: {result['top_features'][0]['feature']} (contribution: {result['top_features'][0]['contribution']:.4f})")
         
     except Exception as e:
         print(f"Error: {e}")
         import traceback
         traceback.print_exc()
-        print("\nMake sure to:")
-        print("1. Run train_base_model.py first")
-        print("2. Provide logs_df with matching feature columns")
-        print("3. Provide user_id, age, and sex for personalization")

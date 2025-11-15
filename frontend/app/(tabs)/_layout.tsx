@@ -42,8 +42,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="prediction"
         options={{
-          title: 'Prediction',
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="chart.line.uptrend.xyaxis" color={color} />,
+          title: 'AI Assistant',
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="sparkles" color={color} />,
         }}
       />
       <Tabs.Screen
