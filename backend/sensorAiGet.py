@@ -46,6 +46,19 @@ def check_migraine_risk(user_id):
     
     try:
         result = predict_migraine(user_id, days_data=days_data, explain=False)
+        
+        from sensorDataAi.user_model_manager import UserModelManager
+        import os
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        manager = UserModelManager(
+            models_dir=os.path.join(script_dir, 'sensorDataAi/models'),
+            user_data_dir=os.path.join(script_dir, 'sensorDataAi/user_data')
+        )
+        
+        top_reasons = manager.get_top_risk_factors(user_id, days_data[-1], top_n=2)
+        result['reason1'] = top_reasons[0] if len(top_reasons) > 0 else 'Unknown'
+        result['reason2'] = top_reasons[1] if len(top_reasons) > 1 else 'Unknown'
+        
         return result
     except FileNotFoundError as e:
         return {
