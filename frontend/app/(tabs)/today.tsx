@@ -259,7 +259,7 @@ export default function TodayScreen() {
                 <ThemedView
                   style={{
                     ...styles.calendarCard,
-                    backgroundColor: theme.card,
+                    backgroundColor: "transparent",
                     borderColor: theme.cardBorder,
                   }}
                 >
@@ -276,11 +276,12 @@ export default function TodayScreen() {
                             borderRightWidth: 1,
                             marginRight: 12,
                             paddingRight: 12,
+                            backgroundColor: "transparent",
                           }),
                         }}
                       >
-                        <ThemedView style={styles.dayHeader}>
-                          <ThemedView style={styles.dayInfo}>
+                        <ThemedView style={{ ...styles.dayHeader, backgroundColor: "transparent" }}>
+                          <ThemedView style={{ ...styles.dayInfo, backgroundColor: "transparent" }}>
                             <ThemedText style={{ ...styles.dayName, color: isToday ? theme.primary : theme.text }}>
                               {day.dayName}
                             </ThemedText>
@@ -301,7 +302,7 @@ export default function TodayScreen() {
                             )}
                           </ThemedView>
                         </ThemedView>
-                        <ThemedView style={styles.riskIndicator}>
+                        <ThemedView style={{ ...styles.riskIndicator, backgroundColor: "transparent" }}>
                           <ThemedView
                             style={{
                               ...styles.riskBar,
@@ -525,15 +526,18 @@ const styles = StyleSheet.create({
   dayHeader: {
     alignItems: 'center',
     width: '100%',
+    backgroundColor: "transparent",
   },
   dayInfo: {
     alignItems: 'center',
     gap: 4,
     width: '100%',
+    backgroundColor: "transparent",
   },
   dayName: {
     fontSize: 13,
     fontWeight: '600',
+    backgroundColor: "transparent",
   },
   dayDate: {
     fontSize: 18,
@@ -569,6 +573,7 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     alignItems: 'center',
     gap: 2,
+    backgroundColor: "transparent",
   },
   riskLabel: {
     fontSize: 11,
