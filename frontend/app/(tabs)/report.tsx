@@ -1,21 +1,25 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import React, { useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 
 export default function ReportScreen() {
   const colorScheme = useColorScheme();
   const theme = Colors[colorScheme ?? 'light'];
+  const router = useRouter();
   const [intensity, setIntensity] = useState<number | null>(null);
   const [selectedTriggers, setSelectedTriggers] = useState<string[]>([]);
-  const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const submitButtonRef = useRef<TouchableOpacity>(null);
 
   const intensityLevels = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
   const triggers = ['Stress', 'Sleep', 'Weather', 'Hormones', 'Food', 'Light', 'Noise'];
-  const symptoms = ['Nausea', 'Sensitivity to Light', 'Sensitivity to Sound', 'Aura', 'Dizziness'];
 
   const toggleTrigger = (trigger: string) => {
     setSelectedTriggers(prev =>
@@ -23,24 +27,54 @@ export default function ReportScreen() {
     );
   };
 
-  const toggleSymptom = (symptom: string) => {
-    setSelectedSymptoms(prev =>
-      prev.includes(symptom) ? prev.filter(s => s !== symptom) : [...prev, symptom]
-    );
-  };
+  const handleSubmit = async () => {
+    if (intensity === null) return;
 
-  const handleSubmit = () => {
-    // TODO: Implement submission logic
-    console.log('Report submitted:', { intensity, triggers: selectedTriggers, symptoms: selectedSymptoms });
+    setIsSubmitting(true);
+    try {
+      // Mock API call
+      await fetch('https://api.example.com/migraine-report', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          intensity,
+          triggers: selectedTriggers,
+          timestamp: new Date().toISOString(),
+        }),
+      });
+
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    } catch (error) {
+      // Mock API will fail, but we'll show success for demo purposes
+      console.log('Mock API call (expected to fail):', error);
+    } finally {
+      setIsSubmitting(false);
+      // Blur any focused elements to prevent accessibility issues
+      if (submitButtonRef.current) {
+        (submitButtonRef.current as any).blur?.();
+      }
+      // Show success indicator
+      setShowSuccess(true);
+      console.log('Success state set to true');
+      // Redirect after 2 seconds
+      setTimeout(() => {
+        console.log('Redirecting to today page');
+        router.push('/(tabs)/today');
+      }, 2000);
+    }
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
-      <ScrollView 
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <ScrollView 
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
         <ThemedView style={styles.header}>
           <ThemedText type="title" style={styles.title}>Report Migraine</ThemedText>
           <ThemedText style={[styles.subtitle, { color: theme.textSecondary }]}>
@@ -116,63 +150,47 @@ export default function ReportScreen() {
           </ThemedView>
         </ThemedView>
 
-        <ThemedView style={[styles.section, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}>
-          <ThemedText type="subtitle" style={styles.sectionTitle}>Symptoms</ThemedText>
-          <ThemedText style={[styles.sectionDescription, { color: theme.textSecondary }]}>
-            Select symptoms you experienced
-          </ThemedText>
-          <ThemedView style={styles.chipContainer}>
-            {symptoms.map(symptom => (
-              <TouchableOpacity
-                key={symptom}
-                onPress={() => toggleSymptom(symptom)}
-                style={[
-                  styles.chip,
-                  {
-                    backgroundColor: selectedSymptoms.includes(symptom)
-                      ? theme.secondary
-                      : theme.inputBackground,
-                    borderColor: selectedSymptoms.includes(symptom)
-                      ? theme.secondary
-                      : theme.inputBorder,
-                  },
-                ]}
-              >
-                <ThemedText
-                  style={[
-                    styles.chipText,
-                    {
-                      color: selectedSymptoms.includes(symptom) ? '#FFFFFF' : theme.text,
-                    },
-                  ]}
-                >
-                  {symptom}
-                </ThemedText>
-              </TouchableOpacity>
-            ))}
-          </ThemedView>
-        </ThemedView>
-
         <TouchableOpacity
+          ref={submitButtonRef}
           onPress={handleSubmit}
           style={[
             styles.submitButton,
             {
               backgroundColor: theme.primary,
-              opacity: intensity === null ? 0.5 : 1,
+              opacity: intensity === null || isSubmitting ? 0.5 : 1,
             },
           ]}
-          disabled={intensity === null}
+          disabled={intensity === null || isSubmitting}
         >
-          <ThemedText style={styles.submitButtonText}>Save Report</ThemedText>
+          <ThemedText style={styles.submitButtonText}>
+            {isSubmitting ? 'Sending...' : 'Save Report'}
+          </ThemedText>
         </TouchableOpacity>
-      </ScrollView>
-    </SafeAreaView>
+        </ScrollView>
+      </SafeAreaView>
+      {showSuccess && (
+        <View 
+          style={styles.successOverlay} 
+          pointerEvents="none"
+          accessible={false}
+          importantForAccessibility="no"
+          onLayout={() => console.log('Success overlay rendered')}
+        >
+          <View style={styles.successIconContainer}>
+            <IconSymbol name="checkmark.circle.fill" size={80} color={theme.success} />
+          </View>
+        </View>
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+    position: 'relative',
+  },
+  safeArea: {
     flex: 1,
   },
   scrollView: {
@@ -248,6 +266,19 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+  },
+  successOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 99999,
+    elevation: 99999,
+  },
+  successIconContainer: {
+    backgroundColor: 'transparent',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 
