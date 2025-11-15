@@ -1,0 +1,9 @@
+# Copy this file to .env and fill in your actual Supabase credentials
+
+SUPABASE_URL=your_supabase_project_url_here
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key_here
+
+# Example:
+# SUPABASE_URL=https://your-project-id.supabase.co
+# SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
