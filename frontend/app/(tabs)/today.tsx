@@ -390,6 +390,7 @@ const styles = StyleSheet.create({
   dayHeader: {
     alignItems: 'center',
     width: '100%',
+    backgroundColor: "transparent",
     minHeight: 70,
     justifyContent: 'flex-start',
   },
@@ -397,6 +398,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     width: '100%',
+    backgroundColor: "transparent",
   },
   badgeContainer: {
     minHeight: 20,
@@ -407,6 +409,7 @@ const styles = StyleSheet.create({
   dayName: {
     fontSize: 13,
     fontWeight: '600',
+    backgroundColor: "transparent",
   },
   dayDate: {
     fontSize: 18,
@@ -443,6 +446,7 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     alignItems: 'center',
     gap: 2,
+    backgroundColor: "transparent",
   },
   riskLabel: {
     fontSize: 11,
