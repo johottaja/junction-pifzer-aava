@@ -14,11 +14,18 @@ The application follows a three-tier architecture:
 ┌─────────────────┐
 │  Mobile Client  │  React Native/Expo (iOS/Android)
 │   (Frontend)    │
-└────────┬────────┘
-         │
-         │ HTTP/REST API
-         │
-┌────────▼────────┐
+└────┬──────┬─────┘
+     │      │
+     │      │ AI Queries
+     │      │
+     │  ┌───▼──────────┐
+     │  │  n8n AI      │
+     │  │  Assistant   │
+     │  └───┬──────────┘
+     │      │
+     │ HTTP/REST API
+     │
+┌────▼────────────┐
 │  FastAPI Server │  Python Backend
 │   (Backend)     │
 └────────┬────────┘
@@ -41,6 +48,7 @@ The application follows a three-tier architecture:
   - **Survey Model**: Logistic Regression processing behavioral and trigger patterns
   - **Ensemble Fusion**: Weighted averaging of predictions for robust risk assessment
 - **Personalization**: Adaptive user-specific models with transfer learning and continuous retraining
+- **AI Assistant**: Agentic AI system built with n8n that provides personalized health insights and answers questions about user reports and migraine patterns
 
 ## Tech Stack
 
@@ -60,6 +68,7 @@ The application follows a three-tier architecture:
 ### Database & Services
 - **Supabase** for PostgreSQL database and authentication
 - **Supabase Python Client** for database operations
+- **n8n** for agentic AI workflow automation and intelligent health assistant
 
 ### Machine Learning
 - **scikit-learn** for ensemble models and classification
@@ -390,6 +399,88 @@ The retraining process:
 3. Creates user-specific aggregated features
 4. Retrains Logistic Regression with balanced weights
 5. Validates performance and saves user-specific model
+
+## AI Assistant (Agentic AI)
+
+HeadSync includes an intelligent AI assistant powered by **n8n** workflows that provides personalized health guidance and insights. The assistant has direct access to user reports, health data, and migraine patterns, enabling contextual conversations about individual health journeys.
+
+### Architecture
+
+The AI assistant is built using **n8n**, an open-source workflow automation platform that orchestrates intelligent agentic workflows. The system connects to the mobile app via secure webhook endpoints and processes user queries with full context of their health data.
+
+**Key Components:**
+- **n8n Workflow Engine**: Orchestrates AI agent workflows and data retrieval
+- **Webhook Integration**: Secure REST API endpoints for mobile app communication
+- **Data Access Layer**: Direct integration with Supabase to retrieve user reports and health records
+- **Contextual Understanding**: AI agent processes user queries with full access to historical data
+
+### Capabilities
+
+The AI assistant can:
+
+- **Analyze Health Patterns**: Review user's daily reports, migraine history, and trigger patterns
+- **Identify Triggers**: Analyze historical data to identify personalized migraine triggers
+- **Provide Prevention Tips**: Offer personalized recommendations based on individual patterns
+- **Answer Questions**: Respond to queries about health data, predictions, and trends
+- **Explain Predictions**: Clarify ML model predictions and feature contributions
+- **Pattern Recognition**: Identify correlations and trends in user's health data over time
+
+### User Interaction
+
+Users interact with the AI assistant through a conversational interface in the mobile app:
+
+- **Natural Language Queries**: Ask questions in plain language about health data
+- **Quick Actions**: Pre-configured queries for common questions:
+  - "What are my triggers?"
+  - "How can I prevent migraines?"
+  - "Show my patterns"
+  - "Analyze my data"
+- **Contextual Responses**: Answers are personalized based on the user's complete health history
+- **Real-Time Insights**: Get instant analysis of recent reports and patterns
+
+### Data Privacy & Security
+
+- **User-Specific Context**: Each conversation is scoped to the authenticated user's data only
+- **Secure Authentication**: API requests include authentication tokens
+- **Data Isolation**: User reports and health data are accessed securely through Supabase
+- **Session Management**: Conversations maintain context within user sessions
+
+### Integration
+
+The AI assistant integrates seamlessly with the HeadSync ecosystem:
+
+```typescript
+// Frontend integration
+const response = await fetch(AI_ENDPOINT, {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'auth': AGENT_AUTH
+  },
+  body: JSON.stringify({
+    message: userQuery,
+    sessionId: userId
+  })
+});
+```
+
+The n8n workflow:
+1. Receives user query with session context
+2. Retrieves user's health reports from Supabase
+3. Analyzes patterns and historical data
+4. Generates contextual response using AI models
+5. Returns personalized insights to the mobile app
+
+### Configuration
+
+Configure the AI assistant endpoint in `frontend/app.config.js`:
+
+```javascript
+extra: {
+  AGENT_AUTH: process.env.AGENT_AUTH,
+  AI_ENDPOINT: process.env.AI_ENDPOINT || 'https://your-n8n-webhook-url'
+}
+```
 
 ## API Endpoints
 
