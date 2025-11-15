@@ -92,11 +92,11 @@ const fetchWeeklyRiskForecast = async (): Promise<Array<{
   // Simulate API call delay
   await new Promise(resolve => setTimeout(resolve, 500));
   
-  // Generate 3 days starting from today
+  // Generate 2 days starting from today (today and tomorrow)
   const days = [];
   const today = new Date();
   
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 2; i++) {
     const date = new Date(today);
     date.setDate(today.getDate() + i);
     
@@ -151,11 +151,6 @@ export default function TodayScreen() {
   const monthName = today.toLocaleDateString('en-US', { month: 'long' });
   const dayNumber = today.getDate();
 
-  const recentActivity = [
-    { time: '2 days ago', intensity: 7, trigger: 'Stress' },
-    { time: '5 days ago', intensity: 5, trigger: 'Sleep' },
-    { time: '1 week ago', intensity: 8, trigger: 'Weather' },
-  ];
 
   useEffect(() => {
     const loadData = async () => {
@@ -255,53 +250,71 @@ export default function TodayScreen() {
 
             {weeklyForecast.length > 0 && (
               <ThemedView style={styles.section}>
-                <ThemedText type="subtitle" style={styles.sectionTitle}>3-Day Forecast</ThemedText>
+                <ThemedText type="subtitle" style={styles.sectionTitle}>Today & Tomorrow</ThemedText>
                 <ThemedView
                   style={{
                     ...styles.calendarCard,
-                    backgroundColor: theme.card,
+                    backgroundColor: "transparent",
                     borderColor: theme.cardBorder,
                   }}
                 >
                   {weeklyForecast.map((day, index) => {
                     const isToday = index === 0;
+                    const isTomorrow = index === 1;
                     const riskColor = getRiskColor(day.riskLevel);
                     return (
                       <ThemedView
                         key={day.date}
                         style={{
                           ...styles.calendarDay,
+                          backgroundColor: 'transparent',
+                          borderColor: theme.primaryDark,
+                          borderWidth: 1,
+                          borderRadius: 12,
                           ...(index !== weeklyForecast.length - 1 && {
-                            borderRightColor: theme.border,
-                            borderRightWidth: 1,
                             marginRight: 12,
                             paddingRight: 12,
+                            backgroundColor: "transparent",
                           }),
                         }}
                       >
-                        <ThemedView style={styles.dayHeader}>
-                          <ThemedView style={styles.dayInfo}>
+                        <ThemedView style={{ ...styles.dayHeader, backgroundColor: "transparent" }}>
+                          <ThemedView style={{ ...styles.dayInfo, backgroundColor: "transparent" }}>
                             <ThemedText style={{ ...styles.dayName, color: isToday ? theme.primary : theme.text }}>
                               {day.dayName}
                             </ThemedText>
                             <ThemedText style={{ ...styles.dayDate, color: theme.textSecondary }}>
                               {day.dayNumber}
                             </ThemedText>
-                            {isToday && (
-                              <ThemedView
-                                style={{
-                                  ...styles.todayBadge,
-                                  backgroundColor: hexToRgba(theme.primary, 0.12),
-                                }}
-                              >
-                                <ThemedText style={{ ...styles.todayBadgeText, color: theme.primary }}>
-                                  Today
-                                </ThemedText>
-                              </ThemedView>
-                            )}
+                            <ThemedView style={styles.badgeContainer}>
+                              {isToday && (
+                                <ThemedView
+                                  style={{
+                                    ...styles.todayBadge,
+                                    backgroundColor: hexToRgba(theme.primary, 0.12),
+                                  }}
+                                >
+                                  <ThemedText style={{ ...styles.todayBadgeText, color: theme.primary }}>
+                                    Today
+                                  </ThemedText>
+                                </ThemedView>
+                              )}
+                              {isTomorrow && (
+                                <ThemedView
+                                  style={{
+                                    ...styles.todayBadge,
+                                    backgroundColor: hexToRgba(theme.primary, 0.12),
+                                  }}
+                                >
+                                  <ThemedText style={{ ...styles.todayBadgeText, color: theme.primary }}>
+                                    Tomorrow
+                                  </ThemedText>
+                                </ThemedView>
+                              )}
+                            </ThemedView>
                           </ThemedView>
                         </ThemedView>
-                        <ThemedView style={styles.riskIndicator}>
+                        <ThemedView style={{ ...styles.riskIndicator, backgroundColor: "transparent" }}>
                           <ThemedView
                             style={{
                               ...styles.riskBar,
@@ -368,54 +381,6 @@ export default function TodayScreen() {
             </ThemedView>
           </>
         )}
-
-        <ThemedView style={styles.section}>
-          <ThemedText type="subtitle" style={styles.sectionTitle}>Recent Activity</ThemedText>
-          <ThemedView
-            style={{
-              ...styles.activityCard,
-              backgroundColor: theme.card,
-              borderColor: theme.cardBorder,
-            }}
-          >
-            {recentActivity.map((activity, index) => (
-              <ThemedView
-                key={index}
-                style={{
-                  ...styles.activityItem,
-                  ...(index !== recentActivity.length - 1 && {
-                    borderBottomColor: theme.border,
-                    borderBottomWidth: 1,
-                    paddingBottom: 16,
-                    marginBottom: 16,
-                  }),
-                }}
-              >
-                <ThemedView style={styles.activityLeft}>
-                  <ThemedView
-                    style={{
-                      ...styles.activityIcon,
-                      backgroundColor: theme.backgroundSecondary,
-                    }}
-                  >
-                    <IconSymbol name="bolt.fill" size={16} color={theme.warning} />
-                  </ThemedView>
-                  <ThemedView style={styles.activityInfo}>
-                    <ThemedText style={styles.activityIntensity}>
-                      Intensity: {activity.intensity}/10
-                    </ThemedText>
-                    <ThemedText style={[styles.activityTrigger, { color: theme.textSecondary }]}>
-                      {activity.trigger}
-                    </ThemedText>
-                  </ThemedView>
-                </ThemedView>
-                <ThemedText style={[styles.activityTime, { color: theme.textSecondary }]}>
-                  {activity.time}
-                </ThemedText>
-              </ThemedView>
-            ))}
-          </ThemedView>
-        </ThemedView>
       </ScrollView>
     </SafeAreaView>
   );
@@ -512,28 +477,43 @@ const styles = StyleSheet.create({
   },
   calendarCard: {
     flexDirection: 'row',
-    padding: 16,
-    borderRadius: 20,
-    borderWidth: 1,
+    padding: 20,
+    borderRadius: 16,
+    borderWidth: 0,
     gap: 0,
+    overflow: 'hidden',
   },
   calendarDay: {
     flex: 1,
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
+    justifyContent: 'flex-start',
+    padding: 16,
+    borderRadius: 12,
   },
   dayHeader: {
     alignItems: 'center',
     width: '100%',
+    backgroundColor: "transparent",
+    minHeight: 70,
+    justifyContent: 'flex-start',
   },
   dayInfo: {
     alignItems: 'center',
     gap: 4,
     width: '100%',
+    backgroundColor: "transparent",
+  },
+  badgeContainer: {
+    minHeight: 20,
+    marginTop: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   dayName: {
     fontSize: 13,
     fontWeight: '600',
+    backgroundColor: "transparent",
   },
   dayDate: {
     fontSize: 18,
@@ -543,7 +523,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 8,
-    marginTop: 4,
+    marginTop: 0,
   },
   todayBadgeText: {
     fontSize: 9,
@@ -552,8 +532,9 @@ const styles = StyleSheet.create({
   },
   riskIndicator: {
     width: '100%',
-    gap: 6,
+    gap: 8,
     alignItems: 'center',
+    marginTop: 4,
   },
   riskBar: {
     width: '100%',
@@ -569,6 +550,7 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     alignItems: 'center',
     gap: 2,
+    backgroundColor: "transparent",
   },
   riskLabel: {
     fontSize: 11,
