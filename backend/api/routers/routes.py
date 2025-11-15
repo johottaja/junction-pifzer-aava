@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from supabase import create_client
 import os
 import sys
+from datetime import datetime, time
 from dotenv import load_dotenv
 
 from ..dependencies.auth import get_current_user
@@ -395,5 +396,162 @@ async def submit_report(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error submitting report: {str(e)}",
+        )
+
+class MigraineHistoryResponse(BaseModel):
+    success: bool
+    migraine_dates: List[str]  # List of dates in YYYY-MM-DD format
+    error: Optional[str] = None
+
+@router.get("/migraine-history/{user_id}", response_model=MigraineHistoryResponse)
+async def get_migraine_history(
+    user_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get historical dates when user experienced migraines.
+    Route: GET /migraine-history/{user_id}
+    Requires authentication via session cookie.
+    Returns a list of dates (YYYY-MM-DD format) when had_migraine was True.
+    """
+    # Verify that the authenticated user can access this user_id
+    if current_user.get("id") != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only access your own migraine history.",
+        )
+    
+    try:
+        # Convert user_id to int (database expects bigint)
+        try:
+            user_id_int = int(user_id) if isinstance(user_id, str) else user_id
+        except (ValueError, TypeError):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid user_id format.",
+            )
+        
+        # Query daily_form table for records where had_migraine is True
+        response = supabase.table("daily_form").select("created_at").eq("user_id", user_id_int).eq("had_migraine", True).order("created_at", desc=False).execute()
+        
+        if not response.data:
+            return MigraineHistoryResponse(
+                success=True,
+                migraine_dates=[],
+                error=None
+            )
+        
+        # Extract dates and format as YYYY-MM-DD
+        migraine_dates = []
+        for record in response.data:
+            created_at = record.get("created_at")
+            if created_at:
+                # Parse the date and format it
+                try:
+                    # Handle ISO format datetime string
+                    if isinstance(created_at, str):
+                        # Extract just the date part (YYYY-MM-DD)
+                        date_str = created_at.split('T')[0]
+                        migraine_dates.append(date_str)
+                    else:
+                        # If it's already a date object, format it
+                        date_str = created_at.strftime('%Y-%m-%d')
+                        migraine_dates.append(date_str)
+                except Exception as e:
+                    print(f"Error parsing date {created_at}: {e}")
+                    continue
+        
+        return MigraineHistoryResponse(
+            success=True,
+            migraine_dates=migraine_dates,
+            error=None
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching migraine history: {str(e)}",
+        )
+
+class DailyReportResponse(BaseModel):
+    success: bool
+    report: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
+
+@router.get("/report-by-date/{user_id}", response_model=DailyReportResponse)
+async def get_report_by_date(
+    user_id: str,
+    date: str = Query(..., description="Date in YYYY-MM-DD format"),  # Required query parameter
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get daily report for a specific date.
+    Route: GET /report-by-date/{user_id}?date=YYYY-MM-DD
+    Requires authentication via session cookie.
+    Returns the full report data for the specified date.
+    """
+    # Verify that the authenticated user can access this user_id
+    if current_user.get("id") != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only access your own reports.",
+        )
+    
+    try:
+        # Convert user_id to int (database expects bigint)
+        try:
+            user_id_int = int(user_id) if isinstance(user_id, str) else user_id
+        except (ValueError, TypeError):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid user_id format.",
+            )
+        
+        # Parse and validate date
+        if not date:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Date parameter is required. Use YYYY-MM-DD format.",
+            )
+        
+        try:
+            target_date = datetime.strptime(date, '%Y-%m-%d').date()
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid date format. Use YYYY-MM-DD.",
+            )
+        
+        # Query for reports on the specified date
+        # We need to match records where created_at falls on the target date
+        date_start = datetime.combine(target_date, time.min).isoformat()
+        date_end = datetime.combine(target_date, time.max).isoformat()
+        
+        response = supabase.table("daily_form").select("*").eq("user_id", user_id_int).gte("created_at", date_start).lte("created_at", date_end).order("created_at", desc=True).limit(1).execute()
+        
+        if not response.data or len(response.data) == 0:
+            return DailyReportResponse(
+                success=False,
+                report=None,
+                error="No report found for this date."
+            )
+        
+        # Return the most recent report for that date
+        report_data = response.data[0]
+        
+        return DailyReportResponse(
+            success=True,
+            report=report_data,
+            error=None
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching report: {str(e)}",
         )
 

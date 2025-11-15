@@ -1,12 +1,19 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { MigraineCalendar } from '@/components/migraine-calendar';
 import { Colors, Fonts } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import React, { useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+
+// API configuration
+const API_BASE_URL = __DEV__ 
+  ? 'http://localhost:8000'
+  : 'https://your-production-api.com';
+const DEV_TOKEN = 'dev-token-12345';
 
 type Answer = 'yes' | 'no' | null;
 
@@ -25,6 +32,9 @@ export default function ReportScreen() {
   const [description, setDescription] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [migraineDates, setMigraineDates] = useState<string[]>([]);
+  const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
+  const [loadingHistory, setLoadingHistory] = useState(true);
   const submitButtonRef = useRef<React.ElementRef<typeof TouchableOpacity>>(null);
   const redirectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -46,6 +56,43 @@ export default function ReportScreen() {
   ];
 
   const intensityLevels = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+  // Fetch migraine history
+  const fetchMigraineHistory = async (userId: string = '1') => {
+    try {
+      setLoadingHistory(true);
+      const response = await fetch(`${API_BASE_URL}/migraine-history/${userId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': DEV_TOKEN,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.success && data.migraine_dates) {
+        setMigraineDates(data.migraine_dates);
+      }
+    } catch (error) {
+      console.error('Error fetching migraine history:', error);
+      // Set empty array on error
+      setMigraineDates([]);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  // Load migraine history on mount
+  useEffect(() => {
+    // TODO: Get actual user_id from auth context/session
+    const userId = '1';
+    fetchMigraineHistory(userId);
+  }, []);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -120,6 +167,9 @@ export default function ReportScreen() {
       // Show success indicator
       setShowSuccess(true);
       console.log('Success state set to true');
+      // Refresh migraine history after successful submission
+      const userId = '1'; // TODO: Get from auth context
+      fetchMigraineHistory(userId);
       // Redirect after 2 seconds
       redirectTimeoutRef.current = setTimeout(() => {
         console.log('Redirecting to today page');
@@ -188,6 +238,16 @@ export default function ReportScreen() {
             Complete your daily health report
           </ThemedText>
         </ThemedView>
+
+        {/* Migraine Calendar */}
+        <MigraineCalendar 
+          migraineDates={migraineDates}
+          currentMonth={currentMonth}
+          onMonthChange={setCurrentMonth}
+          userId="1"
+          apiBaseUrl={API_BASE_URL}
+          apiToken={DEV_TOKEN}
+        />
 
         <ThemedView style={[styles.section, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}>
           <ThemedText type="subtitle" style={styles.sectionTitle}>Daily Questions</ThemedText>
