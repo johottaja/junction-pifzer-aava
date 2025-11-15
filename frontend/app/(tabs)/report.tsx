@@ -1,7 +1,7 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
+import { Colors, Fonts } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import React, { useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
@@ -255,6 +255,7 @@ export default function ReportScreen() {
                     backgroundColor: theme.inputBackground,
                     borderColor: theme.inputBorder,
                     color: theme.text,
+                    fontFamily: Fonts.sans,
                   },
                 ]}
                 placeholder="Enter any additional details..."
