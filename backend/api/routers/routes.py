@@ -26,6 +26,12 @@ except ImportError as e:
     print(f"Warning: Could not import sensorAiGet: {e}")
     check_migraine_risk = None
 
+try:
+    from surveyModelGet import check_migraine_risk_from_survey
+except ImportError as e:
+    print(f"Warning: Could not import surveyModelGet: {e}")
+    check_migraine_risk_from_survey = None
+
 # Load environment variables
 # Try multiple paths to find .env file
 env_paths = [
@@ -178,6 +184,8 @@ async def get_current_user_info(
 class MigraineDataResponse(BaseModel):
     success: bool
     probability: Optional[float] = None  # Percentage value (0-100)
+    reason1: Optional[str] = None  # Top contributing trigger/factor
+    reason2: Optional[str] = None  # Second top contributing trigger/factor
     error: Optional[str] = None
 
 class ReportSubmissionRequest(BaseModel):
@@ -216,9 +224,10 @@ async def get_migraine_data(
 ):
     """
     Get migraine prediction probability for a user.
+    Combines predictions from both sensor model and survey model.
     Route: GET /get-migraine-data/{user_id}
     Requires authentication via session cookie.
-    Returns the migraine risk probability as a percentage (0-100).
+    Returns the average migraine risk probability as a percentage (0-100).
     """
     # Verify that the authenticated user can access this user_id
     if current_user.get("id") != user_id:
@@ -227,14 +236,15 @@ async def get_migraine_data(
             detail="You can only access your own migraine data.",
         )
     
-    if not check_migraine_risk:
+    # Check if at least one prediction system is available
+    if not check_migraine_risk and not check_migraine_risk_from_survey:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Migraine prediction system is not available.",
+            detail="Migraine prediction systems are not available.",
         )
     
     try:
-        # Convert user_id to int (check_migraine_risk expects int)
+        # Convert user_id to int (both functions expect int)
         try:
             user_id_int = int(user_id) if isinstance(user_id, str) else user_id
         except (ValueError, TypeError):
@@ -243,37 +253,139 @@ async def get_migraine_data(
                 detail="Invalid user_id format.",
             )
         
-        # Call check_migraine_risk to get predictio
-        result = check_migraine_risk(user_id_int)
+        probabilities = []
+        errors = []
+        reason1 = None  # From sensor model
+        reason2 = None  # From survey model
         
-        print(f"[get_migraine_data] Result from check_migraine_risk: {result}")
+        # Helper function to convert feature names to human-readable trigger names
+        def feature_to_trigger_name(feature_name: str) -> str:
+            """Convert ML feature names to human-readable trigger names"""
+            feature_mapping = {
+                # Survey model features
+                'stress': 'Stress',
+                'sleep_deprivation': 'Sleep deprivation',
+                'fatigue': 'Fatigue',
+                'emotional_distress': 'Emotional distress',
+                'excessive_caffeine': 'Excessive caffeine',
+                'menstrual': 'Hormonal changes',
+                'irregular_meals': 'Irregular meals',
+                'excessive_alcohol': 'Excessive alcohol',
+                'excessive_noise': 'Excessive noise',
+                'excessive_smells': 'Excessive smells',
+                'travel': 'Travel',
+                'oversleep': 'Oversleeping',
+                'exercise': 'Lack of exercise',
+                'overeating': 'Overeating',
+                'excessive_smoking': 'Excessive smoking',
+                # Sensor model features
+                'Received_Air_Pressure_hPa': 'Air pressure changes',
+                'Sleep_h': 'Sleep schedule',
+                'Stress_level_0_100': 'Stress levels',
+                'Screen_time_h': 'Screen time',
+                'Average_heart_rate_bpm': 'Heart rate',
+                'Steps_and_activity': 'Physical activity',
+            }
+            # Check for user-specific features (e.g., user_stress_mean)
+            if feature_name.startswith('user_'):
+                base_feature = feature_name.replace('user_', '').replace('_mean', '').replace('_std', '')
+                return feature_mapping.get(base_feature, feature_name.replace('_', ' ').title())
+            return feature_mapping.get(feature_name, feature_name.replace('_', ' ').title())
         
-        # Check if result has an error
-        if 'error' in result:
-            print(f"[get_migraine_data] Error in result: {result.get('error')}")
+        # Call sensor model (check_migraine_risk)
+        if check_migraine_risk:
+            try:
+                sensor_result = check_migraine_risk(user_id_int)
+                print(f"[get_migraine_data] Result from check_migraine_risk: {sensor_result}")
+                
+                if 'error' not in sensor_result:
+                    sensor_probability = sensor_result.get('probability')
+                    if sensor_probability is not None:
+                        probabilities.append(float(sensor_probability))
+                        print(f"[get_migraine_data] Sensor model probability: {sensor_probability}")
+                    else:
+                        errors.append("Sensor model: Probability not found in result")
+                    
+                    # Extract reason1 from sensor model
+                    sensor_reason1 = sensor_result.get('reason1')
+                    if sensor_reason1:
+                        reason1 = sensor_reason1
+                        print(f"[get_migraine_data] Sensor model reason1: {reason1}")
+                else:
+                    errors.append(f"Sensor model: {sensor_result.get('error', 'Unknown error')}")
+            except Exception as e:
+                errors.append(f"Sensor model: {str(e)}")
+                print(f"[get_migraine_data] Error calling check_migraine_risk: {e}")
+        else:
+            print("[get_migraine_data] check_migraine_risk not available, skipping sensor model")
+        
+        # Call survey model (check_migraine_risk_from_survey)
+        if check_migraine_risk_from_survey:
+            try:
+                survey_result = check_migraine_risk_from_survey(user_id_int)
+                print(f"[get_migraine_data] Result from check_migraine_risk_from_survey: {survey_result}")
+                
+                if 'error' not in survey_result:
+                    survey_probability = survey_result.get('probability')
+                    if survey_probability is not None:
+                        probabilities.append(float(survey_probability))
+                        print(f"[get_migraine_data] Survey model probability: {survey_probability}")
+                    
+                    # Extract reason2 from survey model (from top_features or reason2 field)
+                    survey_reason2 = survey_result.get('reason2')
+                    if survey_reason2:
+                        reason2 = survey_reason2
+                        print(f"[get_migraine_data] Survey model reason2: {reason2}")
+                    else:
+                        # Fallback: extract from top_features if reason2 not available
+                        survey_top_features = survey_result.get('top_features', [])
+                        if survey_top_features and len(survey_top_features) >= 2:
+                            # Get the second top feature
+                            second_feat = survey_top_features[1]
+                            feature_name = second_feat.get('feature', '') if isinstance(second_feat, dict) else str(second_feat)
+                            if feature_name:
+                                reason2 = feature_to_trigger_name(feature_name)
+                                print(f"[get_migraine_data] Survey model reason2 (from top_features): {reason2}")
+                        elif survey_top_features and len(survey_top_features) >= 1:
+                            # If only one feature available, use it as reason2
+                            first_feat = survey_top_features[0]
+                            feature_name = first_feat.get('feature', '') if isinstance(first_feat, dict) else str(first_feat)
+                            if feature_name:
+                                reason2 = feature_to_trigger_name(feature_name)
+                                print(f"[get_migraine_data] Survey model reason2 (from top_features, single): {reason2}")
+                else:
+                    errors.append(f"Survey model: {survey_result.get('error', 'Unknown error')}")
+            except Exception as e:
+                errors.append(f"Survey model: {str(e)}")
+                print(f"[get_migraine_data] Error calling check_migraine_risk_from_survey: {e}")
+        else:
+            print("[get_migraine_data] check_migraine_risk_from_survey not available, skipping survey model")
+        
+        # Calculate average probability
+        if len(probabilities) == 0:
+            # No successful predictions
+            error_message = "No predictions available. " + "; ".join(errors) if errors else "Both prediction systems failed."
+            print(f"[get_migraine_data] No probabilities available: {error_message}")
             return MigraineDataResponse(
                 success=False,
                 probability=None,
-                error=result.get('error', 'Unknown error occurred')
+                reason1=None,
+                reason2=None,
+                error=error_message
             )
         
-        # Extract probability from result
-        probability = result.get('probability')
+        # Calculate average of available probabilities
+        average_probability = sum(probabilities) / len(probabilities)
+        print(f"[get_migraine_data] Calculated average probability: {average_probability} (from {len(probabilities)} model(s))")
         
-        if probability is None:
-            print(f"[get_migraine_data] Probability not found in result: {result}")
-            return MigraineDataResponse(
-                success=False,
-                probability=None,
-                error="Probability not found in prediction result"
-            )
+        print(f"[get_migraine_data] Top triggers: reason1={reason1} (from sensor), reason2={reason2} (from survey)")
         
-        print(f"[get_migraine_data] Returning probability: {probability}")
-        
-        # Return the probability value
+        # Return the average probability value with reasons
         return MigraineDataResponse(
             success=True,
-            probability=float(probability),
+            probability=float(average_probability),
+            reason1=reason1,
+            reason2=reason2,
             error=None
         )
         
