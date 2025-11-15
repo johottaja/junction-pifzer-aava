@@ -55,8 +55,6 @@ const fetchMigraineRisk = async (userId: string = '1'): Promise<{
   message: string;
 }> => {
   try {
-    console.log(`[fetchMigraineRisk] Calling API: ${API_BASE_URL}/get-migraine-data/${userId}`);
-    
     const response = await fetch(`${API_BASE_URL}/get-migraine-data/${userId}`, {
       method: 'GET',
       headers: {
@@ -65,17 +63,12 @@ const fetchMigraineRisk = async (userId: string = '1'): Promise<{
       },
     });
 
-    console.log(`[fetchMigraineRisk] Response status: ${response.status}`);
-
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`[fetchMigraineRisk] API error response:`, errorText);
       throw new Error(`API error: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
     const data = await response.json();
-    
-    console.log('[fetchMigraineRisk] Response data:', data);
 
     if (!data.success) {
       throw new Error(data.error || 'Failed to fetch migraine data');
@@ -88,7 +81,6 @@ const fetchMigraineRisk = async (userId: string = '1'): Promise<{
     if (data.probability !== undefined && data.probability !== null) {
       // Probability is already a percentage (0-100)
       riskPercentage = Math.round(data.probability);
-      console.log('[fetchMigraineRisk] Extracted probability:', riskPercentage);
     } else {
       // No probability available
       throw new Error(data.error || 'No prediction data available');
@@ -104,9 +96,6 @@ const fetchMigraineRisk = async (userId: string = '1'): Promise<{
       message,
     };
   } catch (error) {
-    console.error('[fetchMigraineRisk] Error details:', error);
-    console.error('[fetchMigraineRisk] Error type:', error instanceof Error ? error.constructor.name : typeof error);
-    console.error('[fetchMigraineRisk] Error message:', error instanceof Error ? error.message : String(error));
     
     // Return default/fallback values on error
     return {
@@ -253,7 +242,7 @@ export default function TodayScreen() {
         setRecommendedActions(actionsResponse.actions);
         setWeeklyForecast(forecastResponse);
       } catch (error) {
-        console.error('Error loading data:', error);
+        // Error handled silently
       } finally {
         setLoading(false);
       }

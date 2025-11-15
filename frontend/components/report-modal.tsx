@@ -3,7 +3,8 @@ import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import React from 'react';
-import { ActivityIndicator, Modal, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Modal, ScrollView, StyleSheet, TouchableOpacity, View, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface ReportData {
   had_migraine?: boolean;
@@ -65,6 +66,7 @@ export function ReportModal({
   const colorScheme = useColorScheme();
   const theme = Colors[colorScheme ?? 'light'];
 
+
   // Format date for display
   const formatDate = (dateStr: string | null): string => {
     if (!dateStr) return '';
@@ -87,17 +89,28 @@ export function ReportModal({
     
     const questions: Array<{ label: string; answer: boolean }> = [];
     
-    Object.entries(fieldLabels).forEach(([key, label]) => {
-      // Check if the key exists in the report object (even if value is null/false)
-      if (key in report) {
-        const value = report[key as keyof ReportData];
-        // Include all fields that exist, treating null as false
+    // Iterate through all keys in the report
+    Object.keys(report).forEach((key) => {
+      // Skip non-question fields
+      if (key === 'had_migraine' || key === 'created_at' || key === 'user_id' || key === 'log_id') {
+        return;
+      }
+      
+      // Get the label from fieldLabels, or use the key as fallback
+      const label = fieldLabels[key] || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+      const value = report[key as keyof ReportData];
+      
+      // Include all boolean fields (true, false, or null treated as false)
+      if (typeof value === 'boolean' || value === null) {
         questions.push({ label, answer: value === true });
       }
     });
-    
     return questions;
   };
+
+  if (!visible) {
+    return null;
+  }
 
   return (
     <Modal
@@ -105,28 +118,35 @@ export function ReportModal({
       transparent
       animationType="fade"
       onRequestClose={onClose}
+      statusBarTranslucent
+      presentationStyle={Platform.OS === 'ios' ? 'overFullScreen' : undefined}
     >
-      <View style={styles.modalOverlay}>
-        <ThemedView style={[styles.modalContent, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}>
-          {/* Header */}
-          <View style={styles.header}>
-            <ThemedText type="title" style={styles.title}>
-              Daily Report
-            </ThemedText>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <ThemedText style={[styles.closeButtonText, { color: theme.text }]}>✕</ThemedText>
-            </TouchableOpacity>
-          </View>
+      <SafeAreaView style={styles.modalOverlay} edges={['top', 'bottom']}>
+        <View style={styles.modalOverlayInner}>
+          <ThemedView style={[styles.modalContent, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}>
+            {/* Header */}
+            <View style={styles.header}>
+              <ThemedText type="title" style={styles.title}>
+                Daily Report
+              </ThemedText>
+              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+                <ThemedText style={[styles.closeButtonText, { color: theme.text }]}>✕</ThemedText>
+              </TouchableOpacity>
+            </View>
 
-          {/* Date */}
-          {date && (
-            <ThemedText style={[styles.dateText, { color: theme.textSecondary }]}>
-              {formatDate(date)}
-            </ThemedText>
-          )}
+            {/* Date */}
+            {date && (
+              <ThemedText style={[styles.dateText, { color: theme.textSecondary }]}>
+                {formatDate(date)}
+              </ThemedText>
+            )}
 
-          {/* Content */}
-          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+            {/* Content */}
+            <ScrollView 
+              style={styles.content} 
+              contentContainerStyle={styles.contentContainer}
+              showsVerticalScrollIndicator={true}
+            >
             {loading && (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color={theme.primary} />
@@ -136,7 +156,7 @@ export function ReportModal({
               </View>
             )}
 
-            {error && (
+            {!loading && error && (
               <View style={styles.errorContainer}>
                 <ThemedText style={[styles.errorText, { color: theme.error || '#FF3B30' }]}>
                   {error}
@@ -144,7 +164,7 @@ export function ReportModal({
               </View>
             )}
 
-            {!loading && !error && report && (
+            {!loading && report && (
               <>
                 {/* Migraine Status */}
                 <View style={[styles.section, { backgroundColor: theme.inputBackground }]}>
@@ -177,12 +197,12 @@ export function ReportModal({
                 </View>
 
                 {/* Daily Questions */}
-                {getAnsweredQuestions().length > 0 && (
-                  <View style={styles.section}>
-                    <ThemedText style={[styles.sectionTitle, { color: theme.text }]}>
-                      Daily Questions
-                    </ThemedText>
-                    {getAnsweredQuestions().map((q, index) => (
+                <View style={styles.section}>
+                  <ThemedText style={[styles.sectionTitle, { color: theme.text }]}>
+                    Daily Questions
+                  </ThemedText>
+                  {getAnsweredQuestions().length > 0 ? (
+                    getAnsweredQuestions().map((q, index) => (
                       <View key={index} style={styles.questionRow}>
                         <ThemedText style={[styles.questionText, { color: theme.text }]}>
                           {q.label}
@@ -195,9 +215,9 @@ export function ReportModal({
                                 ? theme.primary
                                 : theme.inputBackground,
                             },
-                          ]}
-                        >
-                          <ThemedText
+                            ]}
+                          >
+                            <ThemedText
                             style={[
                               styles.answerText,
                               {
@@ -209,22 +229,27 @@ export function ReportModal({
                           </ThemedText>
                         </View>
                       </View>
-                    ))}
-                  </View>
-                )}
-
-                {getAnsweredQuestions().length === 0 && (
-                  <View style={styles.section}>
+                    ))
+                  ) : (
                     <ThemedText style={[styles.emptyText, { color: theme.textSecondary }]}>
                       No daily questions were answered for this report.
                     </ThemedText>
-                  </View>
-                )}
+                  )}
+                </View>
               </>
+            )}
+
+            {!loading && !report && !error && (
+              <View style={styles.section}>
+                <ThemedText style={[styles.emptyText, { color: theme.textSecondary }]}>
+                  No report data available.
+                </ThemedText>
+              </View>
             )}
           </ScrollView>
         </ThemedView>
-      </View>
+        </View>
+      </SafeAreaView>
     </Modal>
   );
 }
@@ -233,6 +258,9 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalOverlayInner: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
@@ -240,7 +268,7 @@ const styles = StyleSheet.create({
   modalContent: {
     width: '100%',
     maxWidth: 500,
-    maxHeight: '80%',
+    height: 600,
     borderRadius: 20,
     borderWidth: 1,
     overflow: 'hidden',
@@ -272,7 +300,9 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   content: {
-    flex: 1,
+    height: 400,
+  },
+  contentContainer: {
     paddingHorizontal: 20,
     paddingBottom: 20,
   },

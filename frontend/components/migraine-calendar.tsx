@@ -53,6 +53,7 @@ export function MigraineCalendar({
   const [loadingReport, setLoadingReport] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
 
+
   // Convert migraine dates to a Set for O(1) lookup
   const migraineDatesSet = new Set(migraineDates);
 
@@ -104,7 +105,6 @@ export function MigraineCalendar({
         setReportData(null);
       }
     } catch (error) {
-      console.error('Error fetching report:', error);
       setReportError('Failed to load report. Please try again.');
       setReportData(null);
     } finally {
@@ -238,24 +238,45 @@ export function MigraineCalendar({
 
           return (
             <View key={index} style={styles.dayCell}>
-              <TouchableOpacity
-                onPress={() => isMigraineDay && handleDayPress(day, dayYear, dayMonth)}
-                disabled={!isMigraineDay}
-                activeOpacity={isMigraineDay ? 0.7 : 1}
-                style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}
-              >
+              {isMigraineDay ? (
+                <TouchableOpacity
+                  onPress={() => handleDayPress(day, dayYear, dayMonth)}
+                  activeOpacity={0.7}
+                  style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <View
+                    style={[
+                      styles.dayCircle,
+                      {
+                        backgroundColor: theme.primary,
+                        opacity: dayOpacity,
+                      },
+                    ]}
+                  >
+                    <ThemedText
+                      style={[
+                        styles.dayText,
+                        {
+                          color: '#FFFFFF',
+                          fontWeight: isToday ? '600' : '400',
+                        },
+                      ]}
+                    >
+                      {day}
+                    </ThemedText>
+                  </View>
+                </TouchableOpacity>
+              ) : (
                 <View
                   style={[
                     styles.dayCircle,
                     {
-                      backgroundColor: isMigraineDay 
-                        ? theme.primary 
-                        : isToday 
-                          ? theme.inputBackground 
-                          : 'transparent',
+                      backgroundColor: isToday 
+                        ? theme.inputBackground 
+                        : 'transparent',
                       borderColor: isToday ? theme.primary : 'transparent',
                       borderWidth: isToday ? 2 : 0,
-                      opacity: dayOpacity, // Apply opacity to the entire circle
+                      opacity: dayOpacity,
                     },
                   ]}
                 >
@@ -263,13 +284,11 @@ export function MigraineCalendar({
                     style={[
                       styles.dayText,
                       {
-                        color: isMigraineDay 
-                          ? '#FFFFFF' 
-                          : isToday 
-                            ? theme.primary 
-                            : isCurrentMonth
-                              ? theme.text
-                              : theme.textSecondary,
+                        color: isToday 
+                          ? theme.primary 
+                          : isCurrentMonth
+                            ? theme.text
+                            : theme.textSecondary,
                         fontWeight: isToday ? '600' : '400',
                       },
                     ]}
@@ -277,7 +296,7 @@ export function MigraineCalendar({
                     {day}
                   </ThemedText>
                 </View>
-              </TouchableOpacity>
+              )}
             </View>
           );
         })}
