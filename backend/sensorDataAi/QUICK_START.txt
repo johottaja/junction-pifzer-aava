@@ -1,0 +1,122 @@
+================================================================================
+                        QUICK START GUIDE
+================================================================================
+
+🚀 USER-SPECIFIC MIGRAINE PREDICTION SYSTEM
+
+⚠️  IMPORTANT: user_id must be INTEGER (int8) - e.g., 123, 456, 789
+
+================================================================================
+3 SIMPLE STEPS
+================================================================================
+
+from sensorDataAi.simple_predict import (
+    store_training_data,
+    train_user_model,
+    predict_migraine
+)
+
+STEP 1: Collect Data (minimum 10 points)
+-----------------------------------------
+
+# Training data = 10 sensors + Migraine_today_0_or_1
+data = {
+    'Screen_time_h': 7.5,
+    'Average_heart_rate_bpm': 74,
+    'Steps_and_activity': 6500,
+    'Sleep_h': 6.5,
+    'Stress_level_0_100': 55,
+    'Respiration_rate_breaths_min': 15,
+    'Saa_Temperature_average_C': 24.0,
+    'Saa_Air_quality_0_5': 3,
+    'Received_Condition_0_3': 1,
+    'Received_Air_Pressure_hPa': 1011.0,
+    'Migraine_today_0_or_1': 1  # 1 = had migraine, 0 = no migraine
+}
+
+# Store training data
+store_training_data(123, data)
+
+
+STEP 2: Train Model (after 10+ points)
+---------------------------------------
+
+result = train_user_model(123)
+print(f"Accuracy: {result['accuracy']:.2f}%")
+
+
+STEP 3: Make Predictions
+-------------------------
+
+# Single day
+result = predict_migraine(123, data=today_data)
+print(f"Risk: {result['probability']:.1f}%")
+
+# OR 7-day prediction (more accurate)
+result = predict_migraine(123, days_data=[day1, day2, ..., today])
+
+
+================================================================================
+FILE LOCATIONS
+================================================================================
+
+Models:     sensorDataAi/models/user_123_model.pkl
+Data:       sensorDataAi/user_data/user_123_data.csv
+Guide:      sensorDataAi/HOW_TO_USE.txt
+
+
+================================================================================
+COMMAND LINE
+================================================================================
+
+# Train model
+python train_user.py 123
+
+# List users  
+python train_user.py --list
+
+# Get user info
+python train_user.py --info 123
+
+
+================================================================================
+REQUIREMENTS
+================================================================================
+
+Per User:
+✓ Minimum 10 data points
+✓ Both migraine AND no-migraine examples
+✓ Integer user_id (int8)
+✓ All 10 sensor fields required
+
+
+================================================================================
+EXAMPLE: Complete Workflow
+================================================================================
+
+# 1. Collect data for user 123
+for i in range(15):
+    sensor_data = get_sensor_data()  # Your function
+    had_migraine = check_migraine()  # Your function
+    store_training_data(123, sensor_data, had_migraine)
+
+# 2. Train
+train_user_model(123)
+
+# 3. Predict
+today = get_today_data()
+result = predict_migraine(123, data=today)
+print(f"Migraine probability: {result['probability']:.1f}%")
+
+
+================================================================================
+FULL DOCUMENTATION
+================================================================================
+
+See HOW_TO_USE.txt for complete guide with all features!
+
+
+================================================================================
+END
+================================================================================
+
