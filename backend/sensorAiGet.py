@@ -1,58 +1,144 @@
-from sensorDataAi.simple_predict import predict_migraine
+import os
+from datetime import datetime, timedelta
+from supabase import create_client
+from dotenv import load_dotenv
+from sensorDataAi.simple_predict import predict_migraine, train_user_model, store_training_data, get_user_info
 
-# format to get the data.
-days_data = [
-    # 6 days ago
-    {'Screen_time_h': 6.0, 'Average_heart_rate_bpm': 70, 
-     'Steps_and_activity': 8000, 'Sleep_h': 7.0, 
-     'Stress_level_0_100': 45, 'Respiration_rate_breaths_min': 14,
-     'Saa_Temperature_average_C': 22.0, 'Saa_Air_quality_0_5': 2,
-     'Received_Condition_0_3': 0, 'Received_Air_Pressure_hPa': 1013.0},
-    
-    # 5 days ago
-    {'Screen_time_h': 7.0, 'Average_heart_rate_bpm': 72, 
-     'Steps_and_activity': 7500, 'Sleep_h': 6.8, 
-     'Stress_level_0_100': 50, 'Respiration_rate_breaths_min': 15,
-     'Saa_Temperature_average_C': 23.0, 'Saa_Air_quality_0_5': 2,
-     'Received_Condition_0_3': 1, 'Received_Air_Pressure_hPa': 1012.0},
-    
-    # 4 days ago
-    {'Screen_time_h': 8.0, 'Average_heart_rate_bpm': 74, 
-     'Steps_and_activity': 7000, 'Sleep_h': 6.5, 
-     'Stress_level_0_100': 55, 'Respiration_rate_breaths_min': 15,
-     'Saa_Temperature_average_C': 24.0, 'Saa_Air_quality_0_5': 3,
-     'Received_Condition_0_3': 1, 'Received_Air_Pressure_hPa': 1011.0},
-    
-    # 3 days ago
-    {'Screen_time_h': 7.5, 'Average_heart_rate_bpm': 73, 
-     'Steps_and_activity': 7200, 'Sleep_h': 6.7, 
-     'Stress_level_0_100': 52, 'Respiration_rate_breaths_min': 15,
-     'Saa_Temperature_average_C': 23.5, 'Saa_Air_quality_0_5': 3,
-     'Received_Condition_0_3': 1, 'Received_Air_Pressure_hPa': 1011.5},
-    
-    # 2 days ago
-    {'Screen_time_h': 9.0, 'Average_heart_rate_bpm': 76, 
-     'Steps_and_activity': 6000, 'Sleep_h': 6.0, 
-     'Stress_level_0_100': 60, 'Respiration_rate_breaths_min': 16,
-     'Saa_Temperature_average_C': 25.0, 'Saa_Air_quality_0_5': 3,
-     'Received_Condition_0_3': 1, 'Received_Air_Pressure_hPa': 1010.0},
-    
-    # Yesterday
-    {'Screen_time_h': 10.0, 'Average_heart_rate_bpm': 78, 
-     'Steps_and_activity': 5500, 'Sleep_h': 5.8, 
-     'Stress_level_0_100': 65, 'Respiration_rate_breaths_min': 16,
-     'Saa_Temperature_average_C': 25.5, 'Saa_Air_quality_0_5': 4,
-     'Received_Condition_0_3': 2, 'Received_Air_Pressure_hPa': 1009.0},
-    
-    # Today (most recent)
-    {'Screen_time_h': 11.0, 'Average_heart_rate_bpm': 80, 
-     'Steps_and_activity': 5000, 'Sleep_h': 5.5, 
-     'Stress_level_0_100': 70, 'Respiration_rate_breaths_min': 17,
-     'Saa_Temperature_average_C': 26.0, 'Saa_Air_quality_0_5': 4,
-     'Received_Condition_0_3': 2, 'Received_Air_Pressure_hPa': 1008.0}
+load_dotenv()
+
+supabase = create_client(
+    os.getenv('SUPABASE_URL'),
+    os.getenv('SUPABASE_SERVICE_ROLE_KEY')
+)
+
+FEATURE_COLUMNS = [
+    'Screen_time_h', 'Average_heart_rate_bpm', 'Steps_and_activity',
+    'Sleep_h', 'Stress_level_0_100', 'Respiration_rate_breaths_min',
+    'Saa_Temperature_average_C', 'Saa_Air_quality_0_5',
+    'Received_Condition_0_3', 'Received_Air_Pressure_hPa'
 ]
 
-# Get prediction
-result = predict_migraine('user123', days_data=days_data, explain=True)
+def get_last_7_days_data(user_id):
+    seven_days_ago = (datetime.now() - timedelta(days=7)).isoformat()
+    
+    response = supabase.table('daily_sensor') \
+        .select('*') \
+        .eq('user_id', user_id) \
+        .gte('created_at', seven_days_ago) \
+        .order('created_at', desc=False) \
+        .execute()
+    
+    return response.data
 
-print(f"Migraine Probability: {result['probability']:.1f}%")
+def format_sensor_data(row):
+    return {feature: row[feature] for feature in FEATURE_COLUMNS if row.get(feature) is not None}
+
+def check_migraine_risk(user_id):
+    rows = get_last_7_days_data(user_id)
+    
+    if not rows:
+        return {'error': 'No data found for the last 7 days', 'user_id': user_id}
+    
+    days_data = [format_sensor_data(row) for row in rows]
+    
+    if not all(len(day) == len(FEATURE_COLUMNS) for day in days_data):
+        return {'error': 'Incomplete sensor data found', 'user_id': user_id}
+    
+    try:
+        result = predict_migraine(user_id, days_data=days_data, explain=False)
+        return result
+    except FileNotFoundError as e:
+        return {
+            'error': 'Model not trained',
+            'message': str(e),
+            'user_id': user_id,
+            'data_points': len(rows)
+        }
+
+def train_user_model_from_db(user_id):
+    response = supabase.table('daily_sensor') \
+        .select('*') \
+        .eq('user_id', user_id) \
+        .not_.is_('Migraine_today_0_or_1', 'null') \
+        .execute()
+    
+    if not response.data:
+        return {'error': 'No training data with migraine outcomes found', 'user_id': user_id}
+    
+    stored_count = 0
+    for row in response.data:
+        sensor_data = format_sensor_data(row)
+        sensor_data['Migraine_today_0_or_1'] = row['Migraine_today_0_or_1']
+        
+        if len(sensor_data) == len(FEATURE_COLUMNS) + 1:
+            store_training_data(user_id, sensor_data)
+            stored_count += 1
+    
+    if stored_count < 10:
+        return {
+            'error': 'Insufficient training data',
+            'message': f'Only {stored_count} valid records found. Need at least 10.',
+            'user_id': user_id
+        }
+    
+    try:
+        result = train_user_model(user_id)
+        return {
+            'success': True,
+            'user_id': user_id,
+            'data_points': result['data_points'],
+            'accuracy': result['accuracy'],
+            'message': 'Model trained successfully'
+        }
+    except Exception as e:
+        return {'error': 'Training failed', 'message': str(e), 'user_id': user_id}
+
+def get_user_model_status(user_id):
+    info = get_user_info(user_id)
+    return {
+        'user_id': user_id,
+        'has_model': info['has_model'],
+        'data_points': info['data_points'],
+        'can_train': info['can_train'],
+        'status': info['status']
+    }
+
+if __name__ == '__main__':
+    import sys
+    
+    if len(sys.argv) < 3:
+        print("\nUsage:")
+        print("  python sensorAiGet.py predict <user_id>  - Check migraine risk")
+        print("  python sensorAiGet.py train <user_id>    - Train/update user model")
+        print("  python sensorAiGet.py status <user_id>   - Check model status")
+        print("\nExamples:")
+        print("  python sensorAiGet.py predict 123")
+        print("  python sensorAiGet.py train 123")
+        print("  python sensorAiGet.py status 123\n")
+        sys.exit(1)
+    
+    action = sys.argv[1]
+    user_id = int(sys.argv[2])
+    
+    if action == 'predict':
+        result = check_migraine_risk(user_id)
+        print("\nMigraine Risk Assessment:")
+        for key, value in result.items():
+            print(f"  {key}: {value}")
+        print()
+    elif action == 'train':
+        result = train_user_model_from_db(user_id)
+        print("\nModel Training Result:")
+        for key, value in result.items():
+            print(f"  {key}: {value}")
+        print()
+    elif action == 'status':
+        result = get_user_model_status(user_id)
+        print("\nUser Model Status:")
+        for key, value in result.items():
+            print(f"  {key}: {value}")
+        print()
+    else:
+        print(f"Unknown action: {action}")
+        sys.exit(1)
+
