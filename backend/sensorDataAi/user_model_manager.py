@@ -327,7 +327,7 @@ class UserModelManager:
         top_factors = []
         for feature, score, value in risk_scores[:top_n]:
             readable = readable_names.get(feature, feature)
-            top_factors.append(f"{readable} ({value:.1f})")
+            top_factors.append(readable)
         
         return top_factors
     

@@ -102,7 +102,7 @@ export default function DevicesScreen() {
           <ThemedView style={styles.header}>
             <ThemedText type="title" style={styles.title}>Connect Your Device</ThemedText>
             <ThemedText style={{ ...styles.description, color: theme.textSecondary }}>
-              Strava pairs with almost every fitness device and app. Get seamless activity uploads - plus a fuller picture of your performance and recovery.
+              HeadSync connects with a wide range of fitness devices and health apps. Sync your activity data seamlessly to get comprehensive insights into your health patterns and migraine predictions.
             </ThemedText>
           </ThemedView>
 
